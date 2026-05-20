@@ -42,8 +42,12 @@ async function loadBlacklist() {
         const data = await res.json();
         blacklist = new Set(data.result || []);
     } catch (err) {
-        console.error(err);
+        console.error("Error loading blacklist", err);
     }
+}
+
+function isBlacklisted(user) {
+    return blacklist.has(user);
 }
 
 // --------------------
@@ -66,7 +70,7 @@ async function getHiveAccount(username) {
 }
 
 // --------------------
-// REPUTATION (bridge.get_profile)
+// REPUTATION
 // --------------------
 async function getReputation(username) {
     const res = await fetch("https://api.hive.blog", {
@@ -85,10 +89,29 @@ async function getReputation(username) {
 }
 
 // --------------------
-// HISTORY (30D PAGINATED)
+// MUTE LIST
+// --------------------
+async function getMuteList(username) {
+    const res = await fetch("https://api.hive.blog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "bridge.list_muted",
+            params: { account: username },
+            id: 1
+        })
+    });
+
+    const json = await res.json();
+    // Veilig tegen null / onverwachte responses
+    return json.result?.muted_by || [];
+}
+
+// --------------------
+// HISTORY (30D)
 // --------------------
 async function getAccountHistory30d(username) {
-
     const limit = 1000;
     let from = -1;
     let all = [];
@@ -97,7 +120,6 @@ async function getAccountHistory30d(username) {
     let stop = false;
 
     while (!stop) {
-
         const res = await fetch("https://api.hive.blog", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -115,14 +137,11 @@ async function getAccountHistory30d(username) {
         if (!batch.length) break;
 
         for (const item of batch) {
-
             const ts = new Date(item[1].timestamp).getTime();
-
             if (ts < cutoff) {
                 stop = true;
                 break;
             }
-
             all.push(item);
         }
 
@@ -135,19 +154,14 @@ async function getAccountHistory30d(username) {
 // --------------------
 // HELPERS
 // --------------------
-function isBlacklisted(user) {
-    return blacklist.has(user);
-}
-
 function getAgeDays(created) {
     return (Date.now() - new Date(created)) / (1000 * 60 * 60 * 24);
 }
 
 // --------------------
-// KE CALCULATION (PeakD exact)
+// KE CALCULATION
 // --------------------
 function computeKE(accountData, globalProperties) {
-
     const authorRewards = accountData ? accountData.posting_rewards / 1000 : 0;
     const curationRewards = accountData ? accountData.curation_rewards / 1000 : 0;
 
@@ -175,10 +189,9 @@ function computeKE(accountData, globalProperties) {
 }
 
 // --------------------
-// POSTS & COMMENTS (7 days)
+// POSTS & COMMENTS (7d)
 // --------------------
 function extractPostsAndComments7d(history, username) {
-
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const user = username.toLowerCase();
 
@@ -193,7 +206,6 @@ function extractPostsAndComments7d(history, username) {
     let comments = 0;
 
     for (const item of history) {
-
         const op = item[1].op;
         if (!op || op[0] !== "comment") continue;
 
@@ -219,13 +231,11 @@ function extractPostsAndComments7d(history, username) {
 // DOWNVOTES
 // --------------------
 function extractDownvotes(history, username) {
-
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const votes = {};
     const user = username.toLowerCase();
 
     for (const item of history) {
-
         const op = item[1].op;
         if (!op || op[0] !== "vote") continue;
 
@@ -249,7 +259,6 @@ function extractDownvotes(history, username) {
 // OUTGOING TRANSFERS
 // --------------------
 function extractOutgoingTransfers(history, username) {
-
     const user = username.toLowerCase();
 
     return history
@@ -297,14 +306,13 @@ function summarizeTransfers(transfers) {
 // HP
 // --------------------
 async function getHP(account) {
-
     const globals = await loadHiveGlobals();
 
     const totalVestingFundHive = parseFloat(globals.total_vesting_fund_hive);
-    const totalVestingShares    = parseFloat(globals.total_vesting_shares);
+    const totalVestingShares = parseFloat(globals.total_vesting_shares);
 
-    const vestingShares   = parseFloat(account.vesting_shares);
-    const receivedShares  = parseFloat(account.received_vesting_shares);
+    const vestingShares = parseFloat(account.vesting_shares);
+    const receivedShares = parseFloat(account.received_vesting_shares);
     const delegatedShares = parseFloat(account.delegated_vesting_shares);
 
     const userVests = vestingShares + receivedShares - delegatedShares;
@@ -318,7 +326,6 @@ async function getHP(account) {
 // MAIN
 // --------------------
 async function checkUser() {
-
     const username = document.getElementById("username").value.trim();
     const dashboard = document.getElementById("dashboard");
 
@@ -333,6 +340,11 @@ async function checkUser() {
         return;
     }
 
+    // Zorg dat blacklist geladen is
+    if (!blacklist.size) {
+        await loadBlacklist();
+    }
+
     const blacklisted = isBlacklisted(username);
     const ageDays = getAgeDays(account.created);
     const hp = await getHP(account);
@@ -343,7 +355,6 @@ async function checkUser() {
     dashboard.innerHTML = `
         <div class="grid">
 
-            <!-- REPUTATION (nu eerste blokje) -->
             <div class="card" id="repCard">
                 <div class="label">Reputation</div>
                 <div class="value" id="repValue">${reputation}</div>
@@ -355,7 +366,7 @@ async function checkUser() {
             </div>
 
             <div class="card" id="hpCard">
-                <div class="label">Staked Hive (HP)</div>
+                <div class="label">Active HP</div>
                 <div class="value">${hp.toFixed(3)}</div>
             </div>
 
@@ -384,13 +395,16 @@ async function checkUser() {
                 <div class="value">Loading…</div>
             </div>
 
-            <!-- KE (voorlaatste blokje) -->
+            <div class="card loading" id="mutedCard">
+                <div class="label">Muted by</div>
+                <div class="value">Loading…</div>
+            </div>
+
             <div class="card" id="keCard">
                 <div class="label">Rewards/Stake Co-efficient (KE)</div>
                 <div class="value" id="keValue">${keData.krampus.toFixed(2)}</div>
             </div>
 
-            <!-- HIVEWATCHERS BLACKLIST (nu laatste blokje) -->
             <div class="card" id="blacklistCard">
                 <div class="label">Hivewatchers blacklist</div>
                 <div class="value">${blacklisted ? "YES" : "NO"}</div>
@@ -400,54 +414,33 @@ async function checkUser() {
 
         <div id="transferTable"></div>
         <div id="downvoteTable"></div>
+        <div id="muteTable"></div>
     `;
 
     // --------------------
-    // COLOR: REPUTATION (nieuwe regels)
+    // COLOR RULES
     // --------------------
     const repCard = document.getElementById("repCard");
+    if (reputation <= 10) repCard.className = "card danger";
+    else if (reputation < 25) repCard.className = "card warning";
+    else repCard.className = "card ok";
 
-    if (reputation <= 10) {
-        repCard.className = "card danger";
-    } else if (reputation < 25) {
-        repCard.className = "card warning";
-    } else {
-        repCard.className = "card ok";
-    }
-
-    // --------------------
-    // COLOR: ACCOUNT AGE
-    // --------------------
     document.getElementById("ageCard").className =
         "card " + (ageDays < 31 ? "danger" : "ok");
 
-    // --------------------
-    // COLOR: HP
-    // --------------------
     document.getElementById("hpCard").className =
         "card " + (hp < 100 ? "danger" : "ok");
 
-    // --------------------
-    // COLOR: KE (nieuwe regels)
-    // --------------------
     const keCard = document.getElementById("keCard");
+    if (keData.krampus < 2) keCard.className = "card ok";
+    else if (keData.krampus < 5) keCard.className = "card warning";
+    else keCard.className = "card danger";
 
-    if (keData.krampus < 2) {
-        keCard.className = "card ok";
-    } else if (keData.krampus < 5) {
-        keCard.className = "card warning";
-    } else {
-        keCard.className = "card danger";
-    }
-
-    // --------------------
-    // COLOR: BLACKLIST (nu laatste blokje)
-    // --------------------
     document.getElementById("blacklistCard").className =
         "card " + (blacklisted ? "danger" : "ok");
 
     // --------------------
-    // LOAD HISTORY
+    // HISTORY
     // --------------------
     const history = await getAccountHistory30d(username);
 
@@ -457,25 +450,16 @@ async function checkUser() {
     document.getElementById("comments7d").innerText = comments;
     document.getElementById("ratio7d").innerText = ratio.toFixed(2);
 
-    // --------------------
-    // POSTS COLOR
-    // --------------------
     const postsCard = document.getElementById("postsCard");
     if (posts > 10) postsCard.className = "card danger";
     else if (posts >= 8) postsCard.className = "card warning";
     else postsCard.className = "card ok";
 
-    // --------------------
-    // COMMENTS COLOR
-    // --------------------
     const commentsCard = document.getElementById("commentsCard");
     if (comments < 7) commentsCard.className = "card danger";
     else if (comments < 14) commentsCard.className = "card warning";
     else commentsCard.className = "card ok";
 
-    // --------------------
-    // RATIO COLOR
-    // --------------------
     const ratioCard = document.getElementById("ratioCard");
     if (ratio <= 0) ratioCard.className = "card danger";
     else if (ratio < 5) ratioCard.className = "card warning";
@@ -493,13 +477,9 @@ async function checkUser() {
 
     const transfersCard = document.getElementById("transfersCard");
 
-    if (totalCombined === 0) {
-        transfersCard.className = "card ok";
-    } else if (totalCombined <= 100) {
-        transfersCard.className = "card warning";
-    } else {
-        transfersCard.className = "card danger";
-    }
+    if (totalCombined === 0) transfersCard.className = "card ok";
+    else if (totalCombined <= 100) transfersCard.className = "card warning";
+    else transfersCard.className = "card danger";
 
     transfersCard.querySelector(".value").innerHTML = `
         ${totalHive.toFixed(3)} HIVE<br>
@@ -516,7 +496,6 @@ async function checkUser() {
 
                 ${Object.entries(summary.perUser)
                     .map(([to, data]) => {
-
                         const label = EXCHANGE_ACCOUNTS.has(to.toLowerCase())
                             ? `${to} (exchange)`
                             : to;
@@ -565,13 +544,46 @@ async function checkUser() {
             </table>
         `;
     }
+
+    // --------------------
+    // MUTED
+    // --------------------
+    const mutedBy = await getMuteList(username);
+    const muteCount = mutedBy.length;
+
+    const mutedCard = document.getElementById("mutedCard");
+    mutedCard.querySelector(".value").innerText = muteCount;
+
+    if (muteCount >= 5) mutedCard.className = "card danger";
+    else if (muteCount > 0) mutedCard.className = "card warning";
+    else mutedCard.className = "card ok";
+
+    if (muteCount > 0) {
+        document.getElementById("muteTable").innerHTML = `
+            <table>
+                <tr>
+                    <th>User</th>
+                </tr>
+                ${mutedBy
+                    .map(user => `
+                        <tr class="danger-row">
+                            <td>${user}</td>
+                        </tr>
+                    `)
+                    .join("")}
+            </table>
+        `;
+    }
 }
 
-// ENTER SUPPORT
-document.getElementById("username").addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
-        checkUser();
+// optioneel: enter‑key support
+document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("username");
+    if (input) {
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter") {
+                checkUser();
+            }
+        });
     }
 });
-
-loadBlacklist();
