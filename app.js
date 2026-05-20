@@ -5,665 +5,417 @@ let blacklist = new Set();
 let globals = null;
 let lastSearch = 0;
 
-// Exchange accounts
+// Exchange accounts (niet meetellen in sommige stats)
 const EXCHANGES = new Set(["binance-hot", "orinoco", "mxchive", "bdhivesteem"]);
 
-// ----------------------------------------------------
-// HELPERS
-// ----------------------------------------------------
-const api = (method, params = []) =>
-    fetch("https://api.hive.blog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
-    }).then(r => r.json()).then(j => j.result);
-fetch("https://api.hive.blog", {
-method: "POST",
-headers: { "Content-Type": "application/json" },
-body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
-}).then(r => r.json()).then(j => j.result);
-
-const daysAgo = d => Date.now() - d * 86400000;
-
-const setCard = (id, value, status) => {
-    const el = document.getElementById(id);
-    el.querySelector(".value").innerHTML = value;
-    el.className = "card " + status;
-const el = document.getElementById(id);
-el.querySelector(".value").innerHTML = value;
-el.className = "card " + status;
-};
-
-const anonId = () => {
-    let id = localStorage.getItem("anon_id");
-    if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem("anon_id", id);
-    }
-    return id;
-let id = localStorage.getItem("anon_id");
-if (!id) {
-id = crypto.randomUUID();
-localStorage.setItem("anon_id", id);
-}
-return id;
-};
-
-async function getOutgoingDelegations(user) {
-    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-
-    return delegs.map(d => ({
-        to: d.delegatee,
-        hp: parseFloat(d.vesting_shares) * (fund / shares)
-    }));
-const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
-const g = await loadGlobals();
-const fund = parseFloat(g.total_vesting_fund_hive);
-const shares = parseFloat(g.total_vesting_shares);
-
-return delegs.map(d => ({
-to: d.delegatee,
-hp: parseFloat(d.vesting_shares) * (fund / shares)
-}));
-}
+// Hive API endpoint
+const HIVE_API = "https://api.hive.blog";
 
 // ----------------------------------------------------
-// LOGGING
+// HELPER: API CALL
 // ----------------------------------------------------
-async function logSearch(username) {
-    const payload = {
-        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
+async function hiveApiCall(method, params = []) {
+    const body = {
+        jsonrpc: "2.0",
+        id: 1,
+        method,
+        params
     };
 
-    try {
-        await fetch(
-            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
-    } catch (e) {
-        console.error("Webhook error:", e);
+    const res = await fetch(HIVE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+        throw new Error(`Hive API error: ${res.status} ${res.statusText}`);
     }
-const payload = {
-content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
-};
 
-try {
-await fetch(
-"https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
-{
-method: "POST",
-headers: { "Content-Type": "application/json" },
-body: JSON.stringify(payload)
+    const json = await res.json();
+    if (json.error) {
+        throw new Error(`Hive RPC error: ${JSON.stringify(json.error)}`);
+    }
+    return json.result;
 }
-);
-} catch (e) {
-console.error("Webhook error:", e);
-}
-}
-
-const throttle = () => {
-    const now = Date.now();
-    if (now - lastSearch < 1500) return false;
-    lastSearch = now;
-    return true;
-const now = Date.now();
-if (now - lastSearch < 1500) return false;
-lastSearch = now;
-return true;
-};
 
 // ----------------------------------------------------
-// LOADERS
+// GLOBALS LADEN
 // ----------------------------------------------------
 async function loadGlobals() {
     if (globals) return globals;
-    globals = await api("condenser_api.get_dynamic_global_properties");
+
+    const dgp = await hiveApiCall("condenser_api.get_dynamic_global_properties", []);
+    globals = {
+        total_vesting_fund_hive: parseFloat(dgp.total_vesting_fund_hive.split(" ")[0]),
+        total_vesting_shares: parseFloat(dgp.total_vesting_shares.split(" ")[0]),
+        head_block_number: dgp.head_block_number,
+        time: dgp.time
+    };
     return globals;
-if (globals) return globals;
-globals = await api("condenser_api.get_dynamic_global_properties");
-return globals;
 }
 
-async function loadBlacklist() {
-    try {
-        const res = await fetch("https://spaminator.me/api/bl/all.json");
-        const data = await res.json();
-        blacklist = new Set(data.result || []);
-    } catch (e) {
-        console.error("Blacklist load error:", e);
-    }
-try {
-const res = await fetch("https://spaminator.me/api/bl/all.json");
-const data = await res.json();
-blacklist = new Set(data.result || []);
-} catch (e) {
-console.error("Blacklist load error:", e);
+// ----------------------------------------------------
+// CONVERSIES
+// ----------------------------------------------------
+function hiveToVests(hiveAmount) {
+    if (!globals) return 0;
+    const { total_vesting_fund_hive, total_vesting_shares } = globals;
+    return hiveAmount * (total_vesting_shares / total_vesting_fund_hive);
 }
+
+function vestsToHP(vests) {
+    if (!globals) return 0;
+    const { total_vesting_fund_hive, total_vesting_shares } = globals;
+    return vests * (total_vesting_fund_hive / total_vesting_shares);
 }
 
 // ----------------------------------------------------
 // ACCOUNT DATA
 // ----------------------------------------------------
-const getAccount = u => api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
-const getReputation = u => api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
-
-async function getHP(acc) {
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-const g = await loadGlobals();
-const fund = parseFloat(g.total_vesting_fund_hive);
-const shares = parseFloat(g.total_vesting_shares);
-
-    const vs = parseFloat(acc.vesting_shares);
-    const rs = parseFloat(acc.received_vesting_shares);
-    const ds = parseFloat(acc.delegated_vesting_shares);
-const vs = parseFloat(acc.vesting_shares);
-const rs = parseFloat(acc.received_vesting_shares);
-const ds = parseFloat(acc.delegated_vesting_shares);
-
-    return (vs + rs - ds) * (fund / shares);
-return (vs + rs - ds) * (fund / shares);
+async function getAccount(username) {
+    const res = await hiveApiCall("condenser_api.get_accounts", [[username]]);
+    if (!res || !res.length) {
+        throw new Error("Account niet gevonden");
+    }
+    return res[0];
 }
 
-async function getDelegatedHP(acc) {
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-    const ds = parseFloat(acc.delegated_vesting_shares);
-    return ds * (fund / shares);
-const g = await loadGlobals();
-const fund = parseFloat(g.total_vesting_fund_hive);
-const shares = parseFloat(g.total_vesting_shares);
-const ds = parseFloat(acc.delegated_vesting_shares);
-return ds * (fund / shares);
+async function getRC(username) {
+    const res = await hiveApiCall("rc_api.find_rc_accounts", [{ accounts: [username] }]);
+    if (!res || !res.rc_accounts || !res.rc_accounts.length) return null;
+    return res.rc_accounts[0];
+}
+
+async function getAccountHistory(username, limit = 1000) {
+    // laatste N operaties
+    const res = await hiveApiCall("condenser_api.get_account_history", [username, -1, limit]);
+    return res || [];
+}
+
+async function getVestingDelegationsOut(username, limit = 1000) {
+    const res = await hiveApiCall("condenser_api.get_vesting_delegations", [username, "", limit]);
+    return res || [];
+}
+
+async function getVestingDelegationsIn(username, limit = 1000) {
+    const res = await hiveApiCall("condenser_api.get_vesting_delegations", ["", username, limit]);
+    // filter op ontvangen delegaties
+    return (res || []).filter(d => d.delegatee === username);
+}
+
+// Pending rewards
+async function getRewardFund() {
+    const res = await hiveApiCall("condenser_api.get_reward_fund", ["post"]);
+    return res;
 }
 
 // ----------------------------------------------------
-// HISTORY
+// REPUTATION
 // ----------------------------------------------------
-async function getHistory30d(user) {
-    const limit = 1000;
-    let from = -1;
-    const cutoff = daysAgo(30);
-    const all = [];
-
-    while (true) {
-        const batch = await api("condenser_api.get_account_history", [user, from, limit]);
-        if (!batch?.length) break;
-
-        for (const h of batch) {
-            const ts = new Date(h[1].timestamp).getTime();
-            if (ts < cutoff) return all;
-            all.push(h);
-        }
-        from = batch[0][0] - 1;
-    }
-    return all;
-const limit = 1000;
-let from = -1;
-const cutoff = daysAgo(30);
-const all = [];
-
-while (true) {
-const batch = await api("condenser_api.get_account_history", [user, from, limit]);
-if (!batch?.length) break;
-
-for (const h of batch) {
-const ts = new Date(h[1].timestamp).getTime();
-if (ts < cutoff) return all;
-all.push(h);
-}
-from = batch[0][0] - 1;
-}
-return all;
+function rawReputationToScore(rawRep) {
+    if (rawRep == null) return 25;
+    let rep = Number(rawRep);
+    if (isNaN(rep)) return 25;
+    let neg = rep < 0;
+    rep = Math.abs(rep);
+    let out = Math.log10(rep);
+    if (isNaN(out)) out = 0;
+    out = Math.max(out - 9, 0);
+    if (neg) out *= -1;
+    out = out * 9 + 25;
+    return Math.round(out * 100) / 100;
 }
 
 // ----------------------------------------------------
-// METRICS
+// KE METRIC (voorbeeld)
 // ----------------------------------------------------
-function postsComments7d(history, user) {
-    const cutoff = daysAgo(7);
-    let posts = 0, comments = 0;
-    const seenPermlinks = new Set();
-const cutoff = daysAgo(7);
-let posts = 0, comments = 0;
-const seenPermlinks = new Set();
-
-    for (const h of history) {
-        const op = h[1].op;
-        if (!op || op[0] !== "comment") continue;
-for (const h of history) {
-const op = h[1].op;
-if (!op || op[0] !== "comment") continue;
-
-        const c = op[1];
-        if (c.author.toLowerCase() !== user) continue;
-const c = op[1];
-if (c.author.toLowerCase() !== user) continue;
-
-        const ts = new Date(h[1].timestamp).getTime();
-        if (ts < cutoff) continue;
-const ts = new Date(h[1].timestamp).getTime();
-if (ts < cutoff) continue;
-
-        if (seenPermlinks.has(c.permlink)) continue;
-        seenPermlinks.add(c.permlink);
-if (seenPermlinks.has(c.permlink)) continue;
-seenPermlinks.add(c.permlink);
-
-        const isPost =
-            c.parent_author === "" &&
-            c.title.trim().length > 0 &&
-            !c.permlink.startsWith("re-");
-const isPost =
-c.parent_author === "" &&
-c.title.trim().length > 0 &&
-!c.permlink.startsWith("re-");
-
-        if (isPost) posts++;
-        else comments++;
-    }
-if (isPost) posts++;
-else comments++;
+// KE = HP + liquid HIVE + (HBD * 1)  (je kunt dit zelf tweaken)
+function calculateKE({ hp, liquidHive, hbd }) {
+    return hp + liquidHive + hbd;
 }
 
-    return { posts, comments, ratio: posts ? comments / posts : 0 };
-return { posts, comments, ratio: posts ? comments / posts : 0 };
+// ----------------------------------------------------
+// BLACKLIST
+// ----------------------------------------------------
+function addToBlacklist(username) {
+    blacklist.add(username.toLowerCase());
+    renderBlacklist();
 }
 
-function downvotes(history, user) {
-    const cutoff = daysAgo(30);
-    const map = {};
-
-    for (const h of history) {
-        const op = h[1].op;
-        if (!op || op[0] !== "vote") continue;
-
-        const v = op[1];
-        const ts = new Date(h[1].timestamp).getTime();
-        if (ts < cutoff) continue;
-
-        if (v.weight < 0 && v.author.toLowerCase() === user) {
-            map[v.voter] = (map[v.voter] || 0) + 1;
-        }
-    }
-    return map;
-const cutoff = daysAgo(30);
-const map = {};
-
-for (const h of history) {
-const op = h[1].op;
-if (!op || op[0] !== "vote") continue;
-
-const v = op[1];
-const ts = new Date(h[1].timestamp).getTime();
-if (ts < cutoff) continue;
-
-if (v.weight < 0 && v.author.toLowerCase() === user) {
-map[v.voter] = (map[v.voter] || 0) + 1;
-}
-}
-return map;
+function removeFromBlacklist(username) {
+    blacklist.delete(username.toLowerCase());
+    renderBlacklist();
 }
 
-function outgoingTransfers(history, user) {
-    return history
-        .filter(h => h[1].op[0] === "transfer")
-        .map(h => h[1].op[1])
-        .filter(t => t.from.toLowerCase() === user);
-return history
-.filter(h => h[1].op[0] === "transfer")
-.map(h => h[1].op[1])
-.filter(t => t.from.toLowerCase() === user);
+function isBlacklisted(username) {
+    return blacklist.has(username.toLowerCase());
 }
 
-function summarizeTransfers(list) {
-    let hive = 0, hbd = 0;
-    const perUser = {};
-let hive = 0, hbd = 0;
-const perUser = {};
-
-    for (const t of list) {
-        const [amt, cur] = t.amount.split(" ");
-        const v = parseFloat(amt);
-for (const t of list) {
-const [amt, cur] = t.amount.split(" ");
-const v = parseFloat(amt);
-
-        if (cur === "HIVE") hive += v;
-        if (cur === "HBD") hbd += v;
-if (cur === "HIVE") hive += v;
-if (cur === "HBD") hbd += v;
-
-        if (!perUser[t.to]) perUser[t.to] = { hive: 0, hbd: 0 };
-        if (cur === "HIVE") perUser[t.to].hive += v;
-        if (cur === "HBD") perUser[t.to].hbd += v;
-    }
-    return { hive, hbd, perUser };
-if (!perUser[t.to]) perUser[t.to] = { hive: 0, hbd: 0 };
-if (cur === "HIVE") perUser[t.to].hive += v;
-if (cur === "HBD") perUser[t.to].hbd += v;
+// ----------------------------------------------------
+// RENDER HELPERS
+// ----------------------------------------------------
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
 }
 
-// Author rewards (7d) in HIVE-equivalent
-async function authorRewards7d(history, user) {
-    const cutoff = daysAgo(7);
-    let hive = 0;
-    let hbd = 0;
-    let vests = 0;
+function setHtml(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = value;
+}
 
-    for (const h of history) {
-        const op = h[1].op;
-        if (!op) continue;
+function setClass(id, className) {
+    const el = document.getElementById(id);
+    if (el) el.className = className;
+}
 
-        const type = op[0];
-        if (type !== "author_reward" && type !== "comment_reward") continue;
+// KE kleur op basis van thresholds
+function getKEClass(ke) {
+    if (ke >= 10000) return "ke-high";
+    if (ke >= 1000) return "ke-mid";
+    return "ke-low";
+}
 
-        const data = op[1];
-        if (!data.author || data.author.toLowerCase() !== user) continue;
+// HP kleur
+function getHPClass(hp) {
+    if (hp >= 1000) return "hp-high";
+    if (hp >= 100) return "hp-mid";
+    return "hp-low";
+}
 
-        const ts = new Date(h[1].timestamp).getTime();
-        if (ts < cutoff) continue;
+// RC kleur (percentage)
+function getRCClass(rcPercent) {
+    if (rcPercent >= 80) return "rc-high";
+    if (rcPercent >= 40) return "rc-mid";
+    return "rc-low";
+}
 
-        if (data.hive_payout) hive += parseFloat(data.hive_payout);
-        if (data.hbd_payout) hbd += parseFloat(data.hbd_payout);
-        if (data.vesting_payout) vests += parseFloat(data.vesting_payout);
+// ----------------------------------------------------
+// RENDER BLACKLIST
+// ----------------------------------------------------
+function renderBlacklist() {
+    const container = document.getElementById("blacklistContainer");
+    if (!container) return;
+
+    if (blacklist.size === 0) {
+        container.innerHTML = "<em>Geen accounts in blacklist</em>";
+        return;
     }
 
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-    const hpFromVests = shares ? fund * (vests / shares) : 0; // HP is al HIVE-equivalent
+    const items = Array.from(blacklist).sort();
+    container.innerHTML = items
+        .map(
+            u =>
+                `<span class="badge bg-danger me-1">${u} <button data-user="${u}" class="btn btn-sm btn-light remove-blacklist-btn">x</button></span>`
+        )
+        .join("");
 
-    const totalHiveEq = hive + hbd + hpFromVests;
-
-    return {
-        hive,
-        hbd,
-        hpHiveEq: hpFromVests,
-        totalHiveEq
-    };
-return { hive, hbd, perUser };
-}
-
-// ----------------------------------------------------
-// KE — KRAMPUS EFFICIENCY
-// ----------------------------------------------------
-async function computeKE(acc) {
-    const g = await loadGlobals();
-const g = await loadGlobals();
-
-    const authorRewards = acc.posting_rewards / 1000;
-    const curationRewards = acc.curation_rewards / 1000;
-const authorRewards = acc.posting_rewards / 1000;
-const curationRewards = acc.curation_rewards / 1000;
-
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-    const vesting = parseFloat(acc.vesting_shares);
-const fund = parseFloat(g.total_vesting_fund_hive);
-const shares = parseFloat(g.total_vesting_shares);
-const vesting = parseFloat(acc.vesting_shares);
-
-    const hpBalance = shares ? (fund * vesting) / shares : 0;
-const hpBalance = shares ? (fund * vesting) / shares : 0;
-
-    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
-const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
-
-    return { authorRewards, curationRewards, hpBalance, krampus };
-return { authorRewards, curationRewards, hpBalance, krampus };
-}
-
-// ----------------------------------------------------
-// MAIN
-// ----------------------------------------------------
-async function checkUser() {
-    const user = document.getElementById("username").value.trim().toLowerCase();
-    if (!user || !throttle()) return;
-
-    logSearch(user);
-const user = document.getElementById("username").value.trim().toLowerCase();
-if (!user || !throttle()) return;
-
-    const dash = document.getElementById("dashboard");
-    dash.innerHTML = "Loading…";
-logSearch(user);
-
-    const acc = await getAccount(user);
-    if (!acc) return dash.innerHTML = "Account not found";
-const dash = document.getElementById("dashboard");
-dash.innerHTML = "Loading…";
-
-    if (!blacklist.size) await loadBlacklist();
-const acc = await getAccount(user);
-if (!acc) return dash.innerHTML = "Account not found";
-
-    const rep = await getReputation(user);
-    const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
-    const hp = await getHP(acc);
-    const dHP = await getDelegatedHP(acc);
-    const dPct = (hp + dHP) > 0 ? (dHP / (hp + dHP)) * 100 : 0;
-    const isBL = blacklist.has(user);
-if (!blacklist.size) await loadBlacklist();
-
-    const ke = await computeKE(acc);
-const rep = await getReputation(user);
-const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
-const hp = await getHP(acc);
-const dHP = await getDelegatedHP(acc);
-const dPct = (hp + dHP) > 0 ? (dHP / (hp + dHP)) * 100 : 0;
-const isBL = blacklist.has(user);
-
-    dash.innerHTML = `
-      <div class="grid">
-          <div class="card" id="repCard"><div class="label">Reputation</div><div class="value">${rep}</div></div>
-          <div class="card" id="ageCard"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
-          <div class="card" id="hpCard"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
-const ke = await computeKE(acc);
-
-          <div class="card" id="delegatedCard"><div class="label">Delegated HP</div><div class="value">${dHP.toFixed(3)}</div></div>
-          <div class="card" id="delegationPctCard"><div class="label">Delegation %</div><div class="value">${dPct.toFixed(1)}%</div></div>
-dash.innerHTML = `
-     <div class="grid">
-         <div class="card" id="repCard"><div class="label">Reputation</div><div class="value">${rep}</div></div>
-         <div class="card" id="ageCard"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
-         <div class="card" id="hpCard"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
-
-          <div class="card" id="keCard"><div class="label">KE (Krampus Efficiency)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
-         <div class="card" id="delegatedCard"><div class="label">Delegated HP</div><div class="value">${dHP.toFixed(3)}</div></div>
-         <div class="card" id="delegationPctCard"><div class="label">Delegation %</div><div class="value">${dPct.toFixed(1)}%</div></div>
-
-          <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
-          <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
-          <div class="card loading" id="ratioCard"><div class="label">Comment/Post ratio</div><div class="value">Loading…</div></div>
-         <div class="card" id="keCard"><div class="label">KE (Krampus Efficiency)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
-
-          <div class="card loading" id="transfersCard"><div class="label">Outgoing transfers (30d)</div><div class="value">Loading…</div></div>
-          <div class="card loading" id="downvotesCard"><div class="label">Incoming downvotes (30d)</div><div class="value">Loading…</div></div>
-         <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
-         <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
-         <div class="card loading" id="ratioCard"><div class="label">Comment/Post ratio</div><div class="value">Loading…</div></div>
-
-          <div class="card loading" id="authorRewards7dCard"><div class="label">Author rewards 7d</div><div class="value">Loading…</div></div>
-         <div class="card loading" id="transfersCard"><div class="label">Outgoing transfers (30d)</div><div class="value">Loading…</div></div>
-         <div class="card loading" id="downvotesCard"><div class="label">Incoming downvotes (30d)</div><div class="value">Loading…</div></div>
-
-          <div class="card" id="blacklistCard"><div class="label">Hivewatchers blacklist</div><div class="value">${isBL ? "YES" : "NO"}</div></div>
-      </div>
-         <div class="card" id="blacklistCard"><div class="label">Hivewatchers blacklist</div><div class="value">${isBL ? "YES" : "NO"}</div></div>
-     </div>
-
-      <h3>Outgoing transfers (30d)</h3>
-      <div id="transferTable"></div>
-     <h3>Outgoing transfers (30d)</h3>
-     <div id="transferTable"></div>
-
-      <h3>Incoming downvotes (30d)</h3>
-      <div id="downvoteTable"></div>
-  `;
-     <h3>Incoming downvotes (30d)</h3>
-     <div id="downvoteTable"></div>
-
-    // Color rules
-    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
-    setCard("ageCard", age, age < 31 ? "danger" : "ok");
-    setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
-
-    setCard("delegatedCard", dHP.toFixed(3), dHP > 25000 ? "warning" : "ok");
-    setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
- `;
-
-    setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
-// Color rules
-setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
-setCard("ageCard", age, age < 31 ? "danger" : "ok");
-setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
-
-    // KE color rules
-    const keStatus =
-        ke.krampus < 2 ? "ok" :
-        ke.krampus < 5 ? "warning" :
-        "danger";
-setCard("delegatedCard", dHP.toFixed(3), dHP > 25000 ? "warning" : "ok");
-setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
-
-    setCard("keCard", ke.krampus.toFixed(4), keStatus);
-setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
-
-    // HISTORY
-    const hist = await getHistory30d(user);
-// KE color rules
-const keStatus =
-    ke.krampus < 0 ? "danger" :
-    ke.krampus < 0.001 ? "warning" :
-    "ok";
-ke.krampus < 2 ? "ok" :
-ke.krampus < 5 ? "warning" :
-"danger";
-
-    const pc = postsComments7d(hist, user);
-    setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
-    setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
-setCard("keCard", ke.krampus.toFixed(4), keStatus);
-
-    const ratioStatus =
-        pc.posts === 0 ? "ok" :
-        pc.ratio < 0 ? "warning" :
-        "ok";
-
-    setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
-
-    // TRANSFERS
-    const transfers = outgoingTransfers(hist, user);
-    const sum = summarizeTransfers(transfers);
-
-    const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
-    setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
-
-    if (Object.keys(sum.perUser).length) {
-        document.getElementById("transferTable").innerHTML = `
-          <table>
-              <tr><th>Recipient</th><th>Total</th></tr>
-              ${Object.entries(sum.perUser).map(([to, v]) => `
-                  <tr class="danger-row">
-                      <td>${EXCHANGES.has(to.toLowerCase()) ? to + " (exchange)" : to}</td>
-                      <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
-                  </tr>
-              `).join("")}
-          </table>
-      `;
-    }
-// HISTORY
-const hist = await getHistory30d(user);
-
-const pc = postsComments7d(hist, user);
-setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
-setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
-
-const ratioStatus =
-pc.posts === 0 ? "ok" :
-pc.ratio < 0 ? "warning" :
-"ok";
-
-setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
-
-// TRANSFERS
-const transfers = outgoingTransfers(hist, user);
-const sum = summarizeTransfers(transfers);
-
-const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
-setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
-
-if (Object.keys(sum.perUser).length) {
-document.getElementById("transferTable").innerHTML = `
-         <table>
-             <tr><th>Recipient</th><th>Total</th></tr>
-             ${Object.entries(sum.perUser).map(([to, v]) => `
-                 <tr class="danger-row">
-                     <td>${EXCHANGES.has(to.toLowerCase()) ? to + " (exchange)" : to}</td>
-                     <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
-                 </tr>
-             `).join("")}
-         </table>
-     `;
-}
-
-    // DOWNVOTES
-    const dv = downvotes(hist, user);
-    const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
-
-    const dvStatus = totalDV >= 10 ? "danger" : totalDV > 0 ? "warning" : "ok";
-    setCard("downvotesCard", totalDV, dvStatus);
-
-    if (totalDV > 0) {
-        document.getElementById("downvoteTable").innerHTML = `
-          <table>
-              <tr><th>User</th><th>Count</th></tr>
-              ${Object.entries(dv).sort((a, b) => b[1] - a[1]).map(([u, c]) => `
-                  <tr class="danger-row"><td>${u}</td><td>${c}</td></tr>
-              `).join("")}
-          </table>
-      `;
-    }
-
-    // AUTHOR REWARDS 7D (HIVE-EQUIVALENT)
-    const ar = await authorRewards7d(hist, user);
-    const arStatus = ar.totalHiveEq >= 100 ? "warning" : "ok";
-    setCard("authorRewards7dCard", `${ar.totalHiveEq.toFixed(3)} HIVE eq`, arStatus);
-// DOWNVOTES
-const dv = downvotes(hist, user);
-const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
-
-const dvStatus = totalDV >= 10 ? "danger" : totalDV > 0 ? "warning" : "ok";
-setCard("downvotesCard", totalDV, dvStatus);
-
-if (totalDV > 0) {
-document.getElementById("downvoteTable").innerHTML = `
-         <table>
-             <tr><th>User</th><th>Count</th></tr>
-             ${Object.entries(dv).sort((a, b) => b[1] - a[1]).map(([u, c]) => `
-                 <tr class="danger-row"><td>${u}</td><td>${c}</td></tr>
-             `).join("")}
-         </table>
-     `;
-}
-}
-
-// ENTER KEY
-document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("username").addEventListener("keydown", e => {
-        if (e.key === "Enter") checkUser();
+    container.querySelectorAll(".remove-blacklist-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            const user = e.target.getAttribute("data-user");
+            removeFromBlacklist(user);
+        });
     });
-document.getElementById("username").addEventListener("keydown", e => {
-if (e.key === "Enter") checkUser();
-});
+}
+
+// ----------------------------------------------------
+// DELEGATION TABLES
+// ----------------------------------------------------
+function renderDelegationsOut(username, delegations) {
+    const tbody = document.getElementById("delegationsOutBody");
+    if (!tbody) return;
+
+    if (!delegations.length) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center">Geen uitgaande delegaties</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = delegations
+        .map(d => {
+            const delegatee = d.delegatee;
+            const vests = parseFloat(d.vesting_shares.split(" ")[0]);
+            const hp = vestsToHP(vests);
+            const isEx = EXCHANGES.has(delegatee);
+            return `
+                <tr class="${isEx ? "table-warning" : ""}">
+                    <td>${delegatee}</td>
+                    <td class="text-end">${hp.toFixed(3)}</td>
+                    <td>${isEx ? "Exchange" : ""}</td>
+                </tr>
+            `;
+        })
+        .join("");
+}
+
+function renderDelegationsIn(username, delegations) {
+    const tbody = document.getElementById("delegationsInBody");
+    if (!tbody) return;
+
+    if (!delegations.length) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center">Geen inkomende delegaties</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = delegations
+        .map(d => {
+            const delegator = d.delegator;
+            const vests = parseFloat(d.vesting_shares.split(" ")[0]);
+            const hp = vestsToHP(vests);
+            const isEx = EXCHANGES.has(delegator);
+            return `
+                <tr class="${isEx ? "table-warning" : ""}">
+                    <td>${delegator}</td>
+                    <td class="text-end">${hp.toFixed(3)}</td>
+                    <td>${isEx ? "Exchange" : ""}</td>
+                </tr>
+            `;
+        })
+        .join("");
+}
+
+// ----------------------------------------------------
+// MAIN RENDER ACCOUNT
+// ----------------------------------------------------
+async function renderAccount(username) {
+    username = username.trim().toLowerCase();
+    if (!username) return;
+
+    const now = Date.now();
+    if (now - lastSearch < 1000) {
+        // simpele throttle
+        return;
+    }
+    lastSearch = now;
+
+    setText("statusText", "Laden...");
+    setClass("statusText", "text-muted");
+
+    try {
+        await loadGlobals();
+
+        const [account, rc, delegOut, delegIn] = await Promise.all([
+            getAccount(username),
+            getRC(username),
+            getVestingDelegationsOut(username),
+            getVestingDelegationsIn(username)
+        ]);
+
+        // --- Basis balances
+        const balanceHive = parseFloat(account.balance.split(" ")[0]);
+        const balanceHbd = parseFloat(account.hbd_balance.split(" ")[0]);
+        const savingsHive = parseFloat(account.savings_balance.split(" ")[0]);
+        const savingsHbd = parseFloat(account.savings_hbd_balance.split(" ")[0]);
+
+        const vestingShares = parseFloat(account.vesting_shares.split(" ")[0]);
+        const receivedVestingShares = parseFloat(account.received_vesting_shares.split(" ")[0]);
+        const delegatedVestingShares = parseFloat(account.delegated_vesting_shares.split(" ")[0]);
+
+        const ownVests = vestingShares - delegatedVestingShares;
+        const ownHP = vestsToHP(ownVests);
+        const receivedHP = vestsToHP(receivedVestingShares);
+        const delegatedHP = vestsToHP(delegatedVestingShares);
+        const totalHP = vestsToHP(vestingShares + receivedVestingShares - delegatedVestingShares);
+
+        const reputation = rawReputationToScore(account.reputation);
+
+        // RC
+        let rcPercent = null;
+        if (rc && rc.max_rc > 0) {
+            rcPercent = (rc.rc_manabar.current_mana / rc.max_rc) * 100;
+        }
+
+        // KE
+        const ke = calculateKE({
+            hp: totalHP,
+            liquidHive: balanceHive + savingsHive,
+            hbd: balanceHbd + savingsHbd
+        });
+
+        // Blacklist status
+        const blacklisted = isBlacklisted(username);
+
+        // --- Render basics
+        setText("accountName", account.name);
+        setText("accountReputation", reputation.toFixed(2));
+        setText("accountCreated", account.created.split("T")[0]);
+
+        setText("balanceHive", balanceHive.toFixed(3));
+        setText("balanceHbd", balanceHbd.toFixed(3));
+        setText("savingsHive", savingsHive.toFixed(3));
+        setText("savingsHbd", savingsHbd.toFixed(3));
+
+        setText("hpOwn", ownHP.toFixed(3));
+        setText("hpReceived", receivedHP.toFixed(3));
+        setText("hpDelegated", delegatedHP.toFixed(3));
+        setText("hpTotal", totalHP.toFixed(3));
+
+        setText("keValue", ke.toFixed(3));
+        setClass("keCard", `card ${getKEClass(ke)}`);
+
+        if (rcPercent != null) {
+            setText("rcPercent", rcPercent.toFixed(1) + " %");
+            setClass("rcCard", `card ${getRCClass(rcPercent)}`);
+        } else {
+            setText("rcPercent", "n/a");
+            setClass("rcCard", "card rc-low");
+        }
+
+        setClass("hpCard", `card ${getHPClass(totalHP)}`);
+
+        // Blacklist knop
+        const blBtn = document.getElementById("blacklistToggleBtn");
+        if (blBtn) {
+            blBtn.textContent = blacklisted ? "Verwijder uit blacklist" : "Voeg toe aan blacklist";
+            blBtn.onclick = () => {
+                if (isBlacklisted(username)) {
+                    removeFromBlacklist(username);
+                } else {
+                    addToBlacklist(username);
+                }
+                renderAccount(username); // refresh status
+            };
+        }
+
+        // Delegaties
+        renderDelegationsOut(username, delegOut);
+        renderDelegationsIn(username, delegIn);
+
+        setText("statusText", "Klaar");
+        setClass("statusText", "text-success");
+    } catch (err) {
+        console.error(err);
+        setText("statusText", "Fout: " + err.message);
+        setClass("statusText", "text-danger");
+    }
+}
+
+// ----------------------------------------------------
+// INIT UI
+// ----------------------------------------------------
+function initUI() {
+    const input = document.getElementById("accountInput");
+    const btn = document.getElementById("searchBtn");
+
+    if (btn && input) {
+        btn.addEventListener("click", () => {
+            const username = input.value;
+            renderAccount(username);
+        });
+
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter") {
+                renderAccount(input.value);
+            }
+        });
+    }
+
+    renderBlacklist();
+}
+
+// ----------------------------------------------------
+// DOM READY
+// ----------------------------------------------------
+document.addEventListener("DOMContentLoaded", () => {
+    initUI();
 });
