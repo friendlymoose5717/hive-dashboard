@@ -244,7 +244,7 @@ const rep = await getReputation(user);
 const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
 const hp = await getHP(acc);
 const dHP = await getDelegatedHP(acc);
-const dPct = hp > 0 ? (dHP / hp) * 100 : 0;
+const dPct = (hp + dHP) > 0 ? (dHP / (hp + dHP)) * 100 : 0;
 const isBL = blacklist.has(user);
 
 dash.innerHTML = `
