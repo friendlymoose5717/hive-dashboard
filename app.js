@@ -149,9 +149,12 @@ function postsComments7d(history, user) {
         const ts = new Date(h[1].timestamp).getTime();
         if (ts < cutoff) continue;
 
-        if (c.parent_author === "") posts++;
+        const isPost = c.parent_author === "" && c.title.trim().length > 0;
+
+        if (isPost) posts++;
         else comments++;
     }
+
     return { posts, comments, ratio: posts ? comments / posts : 0 };
 }
 
