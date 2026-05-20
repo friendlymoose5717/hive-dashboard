@@ -12,11 +12,11 @@ const EXCHANGES = new Set(["binance-hot", "orinoco", "mxchive", "bdhivesteem"]);
 // HELPERS
 // ----------------------------------------------------
 const api = (method, params = []) =>
-fetch("https://api.hive.blog", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
-}).then(r => r.json()).then(j => j.result);
+    fetch("https://api.hive.blog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
+    }).then(r => r.json()).then(j => j.result);
 
 const daysAgo = d => Date.now() - d * 86400000;
 
@@ -222,6 +222,42 @@ function summarizeTransfers(list) {
 }
 
 // ----------------------------------------------------
+// PENDING REWARDS
+// ----------------------------------------------------
+async function getPendingRewards(user) {
+    const posts = await api(
+        "condenser_api.get_discussions_by_author_before_date",
+        [user, null, "2100-01-01T00:00:00", 100]
+    );
+
+    let totalHbd = 0;
+    let totalHive = 0;
+    let totalHp = 0;
+    let count = 0;
+
+    for (const p of posts) {
+        if (p.pending_payout_value === "0.000 HBD") continue;
+
+        const hbd = parseFloat(p.pending_payout_value);
+        const hive = parseFloat(p.pending_payout_hive || "0");
+        const hp = parseFloat(p.pending_payout_hp || "0");
+
+        totalHbd += hbd;
+        totalHive += hive;
+        totalHp += hp;
+        count++;
+    }
+
+    return {
+        totalHbd,
+        totalHive,
+        totalHp,
+        count,
+        avg: count ? totalHbd / count : 0
+    };
+}
+
+// ----------------------------------------------------
 // KE — KRAMPUS EFFICIENCY
 // ----------------------------------------------------
 async function computeKE(acc) {
@@ -254,7 +290,7 @@ async function checkUser() {
     dash.innerHTML = "Loading…";
 
     const acc = await getAccount(user);
-    if (!acc) return dash.innerHTML = "Account not found";
+    if (!acc) return (dash.innerHTML = "Account not found");
 
     if (!blacklist.size) await loadBlacklist();
 
@@ -278,6 +314,8 @@ async function checkUser() {
 
            <div class="card" id="keCard"><div class="label">KE (Krampus Efficiency)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
 
+           <div class="card loading" id="pendingCard"><div class="label">Pending rewards</div><div class="value">Loading…</div></div>
+
            <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
            <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
            <div class="card loading" id="ratioCard"><div class="label">Comment/Post ratio</div><div class="value">Loading…</div></div>
@@ -298,47 +336,61 @@ async function checkUser() {
        <div id="delegationTable"></div>
    `;
 
-// Color rules
-setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
-setCard("ageCard", age, age < 31 ? "danger" : "ok");
-setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
+    // Color rules
+    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
+    setCard("ageCard", age, age < 31 ? "danger" : "ok");
+    setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
 
-setCard("delegatedCard", dHP.toFixed(3), dHP > 25000 ? "warning" : "ok");
-setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
+    setCard("delegatedCard", dHP.toFixed(3), dHP > 25000 ? "warning" : "ok");
+    setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
 
-setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
+    setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
 
-// KE color rules
-const keStatus =
-    ke.krampus < 2 ? "ok" :
-    ke.krampus < 5 ? "warning" :
-    "danger";
+    // KE color rules: <2 green, <5 orange, ≥5 red
+    const keStatus =
+        ke.krampus < 2 ? "ok" :
+        ke.krampus < 5 ? "warning" :
+        "danger";
 
-setCard("keCard", ke.krampus.toFixed(4), keStatus);
+    setCard("keCard", ke.krampus.toFixed(4), keStatus);
 
-// HISTORY
-const hist = await getHistory30d(user);
+    // HISTORY
+    const hist = await getHistory30d(user);
 
-const pc = postsComments7d(hist, user);
-setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
-setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
+    const pc = postsComments7d(hist, user);
+    setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
+    setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
 
-const ratioStatus =
-    pc.posts === 0 ? "ok" :
-    pc.ratio < 0 ? "warning" :
-    "ok";
+    const ratioStatus =
+        pc.posts === 0 ? "ok" :
+        pc.ratio < 0 ? "warning" :
+        "ok";
 
-setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
+    setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
 
-// TRANSFERS
-const transfers = outgoingTransfers(hist, user);
-const sum = summarizeTransfers(transfers);
+    // PENDING REWARDS
+    const pending = await getPendingRewards(user);
 
-const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
-setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
+    const pStatus =
+        pending.totalHbd < 1 ? "danger" :
+        pending.totalHbd < 5 ? "warning" :
+        "ok";
 
-if (Object.keys(sum.perUser).length) {
-    document.getElementById("transferTable").innerHTML = `
+    setCard(
+        "pendingCard",
+        `${pending.totalHbd.toFixed(3)} HBD<br>${pending.totalHive.toFixed(3)} HIVE<br>${pending.totalHp.toFixed(3)} HP<br>${pending.count} posts`,
+        pStatus
+    );
+
+    // TRANSFERS
+    const transfers = outgoingTransfers(hist, user);
+    const sum = summarizeTransfers(transfers);
+
+    const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
+    setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
+
+    if (Object.keys(sum.perUser).length) {
+        document.getElementById("transferTable").innerHTML = `
            <table>
                <tr><th>Recipient</th><th>Total</th></tr>
                ${Object.entries(sum.perUser).map(([to, v]) => `
@@ -349,17 +401,17 @@ if (Object.keys(sum.perUser).length) {
                `).join("")}
            </table>
        `;
-}
+    }
 
-// DOWNVOTES
-const dv = downvotes(hist, user);
-const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
+    // DOWNVOTES
+    const dv = downvotes(hist, user);
+    const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
 
-const dvStatus = totalDV >= 10 ? "danger" : totalDV > 0 ? "warning" : "ok";
-setCard("downvotesCard", totalDV, dvStatus);
+    const dvStatus = totalDV >= 10 ? "danger" : totalDV > 0 ? "warning" : "ok";
+    setCard("downvotesCard", totalDV, dvStatus);
 
-if (totalDV > 0) {
-    document.getElementById("downvoteTable").innerHTML = `
+    if (totalDV > 0) {
+        document.getElementById("downvoteTable").innerHTML = `
            <table>
                <tr><th>User</th><th>Count</th></tr>
                ${Object.entries(dv).sort((a, b) => b[1] - a[1]).map(([u, c]) => `
@@ -367,7 +419,7 @@ if (totalDV > 0) {
                `).join("")}
            </table>
        `;
-}
+    }
 }
 
 // ENTER KEY
