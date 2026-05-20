@@ -340,6 +340,25 @@ setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
     }
 }
 
+const delegs = await getOutgoingDelegations(user);
+
+if (delegs.length) {
+    document.getElementById("delegationTable").innerHTML = `
+        <table>
+            <tr><th>Delegatee</th><th>HP</th></tr>
+            ${delegs.map(d => `
+                <tr>
+                    <td>${d.to}</td>
+                    <td>${d.hp.toFixed(3)}</td>
+                </tr>
+            `).join("")}
+        </table>
+    `;
+} else {
+    document.getElementById("delegationTable").innerHTML = "No outgoing delegations.";
+}
+
+
 // ENTER KEY
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("username").addEventListener("keydown", e => {
