@@ -254,7 +254,7 @@ async function checkUser() {
     setCard("ageCard", age, age < 31 ? "danger" : "ok");
     setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
 
-    setCard("delegatedCard", dHP.toFixed(3), dHP > 0 ? "warning" : "ok");
+    setCard("delegatedCard", dHP.toFixed(3), dHP > 25000 ? "warning" : "ok");
     setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
 
     setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
