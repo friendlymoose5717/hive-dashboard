@@ -483,7 +483,7 @@ async function checkUser() {
 
     if (Object.keys(summary.perUser).length > 0) {
         document.getElementById("transferTable").innerHTML = `
-            <h3>Outgoing transfers (30d)</h3>
+            <div class="table-title">Outgoing transfers (30d)</div>
             <table>
                 <tr>
                     <th>Recipient</th>
@@ -521,7 +521,7 @@ async function checkUser() {
 
     if (totalDownvotes > 0) {
         document.getElementById("downvoteTable").innerHTML = `
-            <h3>Incoming downvotes (30d)</h3>
+            <div class="table-title">Incoming downvotes (30d)</div>
             <table>
                 <tr>
                     <th>User</th>
@@ -539,16 +539,8 @@ async function checkUser() {
             </table>
         `;
     }
-}
 
-// ENTER KEY SUPPORT
-document.addEventListener("DOMContentLoaded", () => {
-    const input = document.getElementById("username");
-    if (input) {
-        input.addEventListener("keydown", e => {
-            if (e.key === "Enter") {
-                checkUser();
-            }
-        });
-    }
-});
+    // DISCORD LINK
+    dashboard.innerHTML += `
+        <div style="text-align:center; margin-top:20px;">
+            <a href="https://discord.gg/txTGEH5zr4"
