@@ -35,7 +35,7 @@ async function logSearch(username) {
 
 function throttleSearch(username) {
     const now = Date.now();
-    if (now - lastSearch < 1500) return; // 1.5s cooldown
+    if (now - lastSearch < 1500) return; 
     lastSearch = now;
     logSearch(username);
 }
@@ -63,7 +63,7 @@ async function loadHiveGlobals() {
 }
 
 // --------------------
-// BLACKLIST (SPAMINATOR)
+// BLACKLIST
 // --------------------
 async function loadBlacklist() {
     try {
@@ -115,25 +115,6 @@ async function getReputation(username) {
 
     const json = await res.json();
     return json.result?.reputation || 0;
-}
-
-// --------------------
-// MUTE LIST (WHO MUTES THIS USER)
-// --------------------
-async function getMuteList(username) {
-    const res = await fetch("https://api.hive.blog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "bridge.list_muted",
-            params: { account: username },
-            id: 1
-        })
-    });
-
-    const json = await res.json();
-    return json.result?.muted_by || [];
 }
 
 // --------------------
@@ -282,7 +263,6 @@ function extractDownvotes(history, username) {
 
     return votes;
 }
-
 // --------------------
 // OUTGOING TRANSFERS
 // --------------------
@@ -424,11 +404,6 @@ async function checkUser() {
                 <div class="value">Loading…</div>
             </div>
 
-            <div class="card loading" id="mutedCard">
-                <div class="label">Muted by</div>
-                <div class="value">Loading…</div>
-            </div>
-
             <div class="card" id="keCard">
                 <div class="label">Rewards/Stake Co-efficient (KE)</div>
                 <div class="value" id="keValue">${keData.krampus.toFixed(2)}</div>
@@ -441,9 +416,11 @@ async function checkUser() {
 
         </div>
 
+        <h3 style="margin-top:30px;">Outgoing transfers (30d)</h3>
         <div id="transferTable"></div>
+
+        <h3 style="margin-top:30px;">Incoming downvotes (30d)</h3>
         <div id="downvoteTable"></div>
-        <div id="muteTable"></div>
     `;
 
     // COLOR RULES
@@ -496,13 +473,17 @@ async function checkUser() {
 
     const totalHive = summary.totalHive;
     const totalHbd = summary.totalHbd;
-    const totalCombined = totalHive + totalHbd;
 
     const transfersCard = document.getElementById("transfersCard");
 
-    if (totalCombined === 0) transfersCard.className = "card ok";
-    else if (totalCombined <= 100) transfersCard.className = "card warning";
-    else transfersCard.className = "card danger";
+    // NEW RULES:
+    // >10 HIVE OR >5 HBD = ORANJE (warning)
+    // otherwise = GREEN (ok)
+    if (totalHive > 10 || totalHbd > 5) {
+        transfersCard.className = "card warning";
+    } else {
+        transfersCard.className = "card ok";
+    }
 
     transfersCard.querySelector(".value").innerHTML = `
         ${totalHive.toFixed(3)} HIVE<br>
@@ -562,34 +543,6 @@ async function checkUser() {
                             <td>${data.count}</td>
                         </tr>
                     `).join("")}
-            </table>
-        `;
-    }
-
-    // MUTED
-    const mutedBy = await getMuteList(username);
-    const muteCount = mutedBy.length;
-
-    const mutedCard = document.getElementById("mutedCard");
-    mutedCard.querySelector(".value").innerText = muteCount;
-
-    if (muteCount >= 5) mutedCard.className = "card danger";
-    else if (muteCount > 0) mutedCard.className = "card warning";
-    else mutedCard.className = "card ok";
-
-    if (muteCount > 0) {
-        document.getElementById("muteTable").innerHTML = `
-            <table>
-                <tr>
-                    <th>User</th>
-                </tr>
-                ${mutedBy
-                    .map(user => `
-                        <tr class="danger-row">
-                            <td>${user}</td>
-                        </tr>
-                    `)
-                    .join("")}
             </table>
         `;
     }
