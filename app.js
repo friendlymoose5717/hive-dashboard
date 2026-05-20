@@ -138,6 +138,7 @@ async function getHistory30d(user) {
 function postsComments7d(history, user) {
     const cutoff = daysAgo(7);
     let posts = 0, comments = 0;
+    const seenPermlinks = new Set();
 
     for (const h of history) {
         const op = h[1].op;
@@ -149,19 +150,14 @@ function postsComments7d(history, user) {
         const ts = new Date(h[1].timestamp).getTime();
         if (ts < cutoff) continue;
 
+        // Skip if we've already counted this permlink (edited post)
+        if (seenPermlinks.has(c.permlink)) continue;
+        seenPermlinks.add(c.permlink);
+
         const isPost =
             c.parent_author === "" &&
             c.title.trim().length > 0 &&
             !c.permlink.startsWith("re-");
-
-        // 🔍 DEBUG: show exactly what the script sees
-        console.log("POST DEBUG", {
-            isPost,
-            title: c.title,
-            parent_author: c.parent_author,
-            permlink: c.permlink,
-            timestamp: h[1].timestamp
-        });
 
         if (isPost) posts++;
         else comments++;
@@ -169,6 +165,7 @@ function postsComments7d(history, user) {
 
     return { posts, comments, ratio: posts ? comments / posts : 0 };
 }
+
 
 function downvotes(history, user) {
     const cutoff = daysAgo(30);
