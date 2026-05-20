@@ -149,7 +149,10 @@ function postsComments7d(history, user) {
         const ts = new Date(h[1].timestamp).getTime();
         if (ts < cutoff) continue;
 
-        const isPost = c.parent_author === "" && c.title.trim().length > 0;
+        const isPost =
+            c.parent_author === "" &&
+            c.title.trim().length > 0 &&
+            !c.permlink.startsWith("re-");
 
         if (isPost) posts++;
         else comments++;
