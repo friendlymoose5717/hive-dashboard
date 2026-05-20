@@ -154,6 +154,15 @@ function postsComments7d(history, user) {
             c.title.trim().length > 0 &&
             !c.permlink.startsWith("re-");
 
+        // 🔍 DEBUG: show exactly what the script sees
+        console.log("POST DEBUG", {
+            isPost,
+            title: c.title,
+            parent_author: c.parent_author,
+            permlink: c.permlink,
+            timestamp: h[1].timestamp
+        });
+
         if (isPost) posts++;
         else comments++;
     }
