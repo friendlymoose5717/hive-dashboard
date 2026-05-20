@@ -35,6 +35,18 @@ const anonId = () => {
     return id;
 };
 
+async function getOutgoingDelegations(user) {
+    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+
+    return delegs.map(d => ({
+        to: d.delegatee,
+        hp: parseFloat(d.vesting_shares) * (fund / shares)
+    }));
+}
+
 // ----------------------------------------------------
 // LOGGING
 // ----------------------------------------------------
@@ -277,8 +289,14 @@ async function checkUser() {
     const pc = postsComments7d(hist, user);
     setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
     setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
-    setCard("ratioCard", pc.ratio.toFixed(2), pc.ratio <= 0 ? "danger" : pc.ratio < 5 ? "warning" : "ok");
+  //  setCard("ratioCard", pc.ratio.toFixed(2), pc.ratio <= 0 ? "danger" : pc.ratio < 5 ? "warning" : "ok");
+const ratioStatus =
+    pc.posts === 0 ? "ok" :
+    pc.ratio < 0 ? "warning" :
+    "ok";
 
+setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
+    
     // TRANSFERS
     const transfers = outgoingTransfers(hist, user);
     const sum = summarizeTransfers(transfers);
