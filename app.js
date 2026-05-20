@@ -271,6 +271,9 @@ async function checkUser() {
 
         <h3>Incoming downvotes (30d)</h3>
         <div id="downvoteTable"></div>
+
+        <h3>Outgoing delegations</h3>
+        <div id="delegationTable"></div>
     `;
 
     // Color rules
