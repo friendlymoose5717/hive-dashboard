@@ -5,8 +5,6 @@
     <title>Account health stats</title>
 
     <style>
-        /* ---------- GLOBAL ---------- */
-
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -56,8 +54,6 @@
             background: #16a34a;
         }
 
-        /* ---------- GRID ---------- */
-
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -65,20 +61,13 @@
             margin-top: 25px;
         }
 
-        /* Responsive */
         @media (max-width: 900px) {
-            .grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            .grid { grid-template-columns: repeat(2, 1fr); }
         }
 
         @media (max-width: 600px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
+            .grid { grid-template-columns: 1fr; }
         }
-
-        /* ---------- CARDS ---------- */
 
         .card {
             background: #111827;
@@ -88,24 +77,19 @@
             transition: 0.25s;
         }
 
-        /* STATUS COLORS */
-
         .card.ok {
             background: #064e3b;
             border-color: #10b981;
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
         }
 
         .card.warning {
             background: #4a3a00;
             border-color: #f59e0b;
-            box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
         }
 
         .card.danger {
             background: #7f1d1d;
             border-color: #ef4444;
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
         }
 
         .card.loading {
@@ -113,8 +97,6 @@
             border-color: #374151;
             opacity: 0.6;
         }
-
-        /* TEXT INSIDE CARDS */
 
         .label {
             font-size: 12px;
@@ -126,8 +108,6 @@
             margin-top: 6px;
             font-weight: bold;
         }
-
-        /* ---------- TABLES ---------- */
 
         table {
             width: 100%;
@@ -172,16 +152,37 @@
 
 </div>
 
-<footer style="margin-top:40px; text-align:center; opacity:0.6; font-size:0.85rem;">
+<footer style="margin-top:40px; text-align:center; opacity:0.85; font-size:0.9rem;">
+
     <img src="https://files.peakd.com/file/peakd-hive/friendlymoose/avatar.png"
          alt="Friendlymoose avatar"
          style="width:40px; height:40px; border-radius:50%; display:block; margin:0 auto 6px auto;">
-    Created by 
-    <a href="https://peakd.com/@friendlymoose"
+
+    <div style="margin-bottom:6px;">
+        Created by 
+        <a href="https://peakd.com/@friendlymoose"
+           target="_blank"
+           style="color:#e5e7eb; text-decoration:underline;">
+           Friendlymoose
+        </a>
+    </div>
+
+    <a href="https://discord.gg/txTGEH5zr4"
        target="_blank"
-       style="color:#e5e7eb; text-decoration:underline;">
-       Friendlymoose
+       style="
+           display:inline-flex;
+           align-items:center;
+           gap:6px;
+           text-decoration:none;
+           color:#7289da;
+           font-weight:bold;
+       ">
+        <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg"
+             alt="Discord"
+             style="width:20px; height:20px; filter:invert(60%) sepia(20%) saturate(800%) hue-rotate(200deg);">
+        Join our Discord
     </a>
+
 </footer>
 
 <script src="app.js"></script>
