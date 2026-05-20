@@ -309,12 +309,9 @@ setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
 
 // KE color rules
 const keStatus =
-    ke.krampus < 0 ? "danger" :
-    ke.krampus < 0.001 ? "warning" :
-    "ok";
 ke.krampus < 2 ? "ok" :
 ke.krampus < 5 ? "warning" :
-"danger";
+ke.krampus >5 ? "danger";
 
 setCard("keCard", ke.krampus.toFixed(4), keStatus);
 
