@@ -1,561 +1,315 @@
+// ----------------------------------------------------
+// GLOBALS
+// ----------------------------------------------------
 let blacklist = new Set();
-let hiveGlobals = null;
+let globals = null;
 let lastSearch = 0;
 
-// --------------------
-// EXCHANGE ACCOUNTS
-// --------------------
-const EXCHANGE_ACCOUNTS = new Set([
-    "binance-hot",
-    "orinoco",
-    "mxchive",
-    "bdhivesteem"
-]);
+// Exchange accounts
+const EXCHANGES = new Set(["binance-hot", "orinoco", "mxchive", "bdhivesteem"]);
 
-// --------------------
-// DISCORD LOGGING
-// --------------------
+// ----------------------------------------------------
+// HELPERS
+// ----------------------------------------------------
+const api = (method, params = []) =>
+    fetch("https://api.hive.blog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
+    }).then(r => r.json()).then(j => j.result);
+
+const daysAgo = d => Date.now() - d * 86400000;
+
+const setCard = (id, value, status) => {
+    const el = document.getElementById(id);
+    el.querySelector(".value").innerHTML = value;
+    el.className = "card " + status;
+};
+
+const anonId = () => {
+    let id = localStorage.getItem("anon_id");
+    if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("anon_id", id);
+    }
+    return id;
+};
+
+// ----------------------------------------------------
+// LOGGING
+// ----------------------------------------------------
 async function logSearch(username) {
-    const webhookUrl = "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR";
-
     const payload = {
-        content: `🔍 Zoekopdracht: **${username}**`
+        content: `🔍 Search: **${username}**\n🆔 Anonymous ID: \`${anonId()}\``
     };
 
     try {
-        await fetch(webhookUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-    } catch (err) {
-        console.error("Webhook fout:", err);
+        await fetch(
+            "https://discord.com/api/webhooks/1506564033141018674/p0rGAjrficEBUJ0v1jobUQXeyO8FL3gIU8roaMcDIH3QlmGl3gMKUutuV38FlwSB3kIR",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch (e) {
+        console.error("Webhook error:", e);
     }
 }
 
-function throttleSearch(username) {
+const throttle = () => {
     const now = Date.now();
-    if (now - lastSearch < 1500) return; 
+    if (now - lastSearch < 1500) return false;
     lastSearch = now;
-    logSearch(username);
+    return true;
+};
+
+// ----------------------------------------------------
+// LOADERS
+// ----------------------------------------------------
+async function loadGlobals() {
+    if (globals) return globals;
+    globals = await api("condenser_api.get_dynamic_global_properties");
+    return globals;
 }
 
-// --------------------
-// LOAD GLOBAL PROPS
-// --------------------
-async function loadHiveGlobals() {
-    if (hiveGlobals) return hiveGlobals;
-
-    const res = await fetch("https://api.hive.blog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "condenser_api.get_dynamic_global_properties",
-            params: [],
-            id: 1
-        })
-    });
-
-    const json = await res.json();
-    hiveGlobals = json.result;
-    return hiveGlobals;
-}
-
-// --------------------
-// BLACKLIST
-// --------------------
 async function loadBlacklist() {
     try {
         const res = await fetch("https://spaminator.me/api/bl/all.json");
         const data = await res.json();
         blacklist = new Set(data.result || []);
-    } catch (err) {
-        console.error("Error loading blacklist", err);
+    } catch (e) {
+        console.error("Blacklist load error:", e);
     }
 }
 
-function isBlacklisted(user) {
-    return blacklist.has(user);
+// ----------------------------------------------------
+// ACCOUNT DATA
+// ----------------------------------------------------
+const getAccount = u => api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
+const getReputation = u => api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
+
+async function getHP(acc) {
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+
+    const vs = parseFloat(acc.vesting_shares);
+    const rs = parseFloat(acc.received_vesting_shares);
+    const ds = parseFloat(acc.delegated_vesting_shares);
+
+    return (vs + rs - ds) * (fund / shares);
 }
 
-// --------------------
-// ACCOUNT
-// --------------------
-async function getHiveAccount(username) {
-    const res = await fetch("https://api.hive.blog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "condenser_api.get_accounts",
-            params: [[username]],
-            id: 1
-        })
-    });
-
-    const json = await res.json();
-    return json.result?.[0] || null;
+async function getDelegatedHP(acc) {
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+    const ds = parseFloat(acc.delegated_vesting_shares);
+    return ds * (fund / shares);
 }
 
-// --------------------
-// REPUTATION
-// --------------------
-async function getReputation(username) {
-    const res = await fetch("https://api.hive.blog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "bridge.get_profile",
-            params: { account: username },
-            id: 1
-        })
-    });
-
-    const json = await res.json();
-    return json.result?.reputation || 0;
-}
-
-// --------------------
-// HISTORY (30D)
-// --------------------
-async function getAccountHistory30d(username) {
+// ----------------------------------------------------
+// HISTORY
+// ----------------------------------------------------
+async function getHistory30d(user) {
     const limit = 1000;
     let from = -1;
-    let all = [];
+    const cutoff = daysAgo(30);
+    const all = [];
 
-    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    let stop = false;
+    while (true) {
+        const batch = await api("condenser_api.get_account_history", [user, from, limit]);
+        if (!batch?.length) break;
 
-    while (!stop) {
-        const res = await fetch("https://api.hive.blog", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                jsonrpc: "2.0",
-                method: "condenser_api.get_account_history",
-                params: [username, from, limit],
-                id: 1
-            })
-        });
-
-        const json = await res.json();
-        const batch = json.result || [];
-
-        if (!batch.length) break;
-
-        for (const item of batch) {
-            const ts = new Date(item[1].timestamp).getTime();
-            if (ts < cutoff) {
-                stop = true;
-                break;
-            }
-            all.push(item);
+        for (const h of batch) {
+            const ts = new Date(h[1].timestamp).getTime();
+            if (ts < cutoff) return all;
+            all.push(h);
         }
-
         from = batch[0][0] - 1;
     }
-
     return all;
 }
 
-// --------------------
-// HELPERS
-// --------------------
-function getAgeDays(created) {
-    return (Date.now() - new Date(created)) / (1000 * 60 * 60 * 24);
-}
+// ----------------------------------------------------
+// METRICS
+// ----------------------------------------------------
+function postsComments7d(history, user) {
+    const cutoff = daysAgo(7);
+    let posts = 0, comments = 0;
 
-// --------------------
-// KE CALCULATION
-// --------------------
-function computeKE(accountData, globalProperties) {
-    const authorRewards = accountData ? accountData.posting_rewards / 1000 : 0;
-    const curationRewards = accountData ? accountData.curation_rewards / 1000 : 0;
-
-    const hpBalance =
-        !accountData ||
-        !globalProperties.total_vesting_shares ||
-        !globalProperties.total_vesting_fund_hive
-            ? 0
-            : parseFloat(
-                  (
-                      parseFloat(globalProperties.total_vesting_fund_hive) *
-                      (parseFloat(accountData.vesting_shares?.amount || accountData.vesting_shares) /
-                          parseFloat(globalProperties.total_vesting_shares))
-                  ).toFixed(3)
-              );
-
-    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
-
-    return {
-        authorRewards,
-        curationRewards,
-        hpBalance,
-        krampus
-    };
-}
-
-// --------------------
-// POSTS & COMMENTS (7d)
-// --------------------
-function extractPostsAndComments7d(history, username) {
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const user = username.toLowerCase();
-
-    const excludedParents = [
-        "peak.snaps",
-        "ecency.waves",
-        "leothreads",
-        "liketu.moments"
-    ];
-
-    let posts = 0;
-    let comments = 0;
-
-    for (const item of history) {
-        const op = item[1].op;
+    for (const h of history) {
+        const op = h[1].op;
         if (!op || op[0] !== "comment") continue;
 
-        const data = op[1];
+        const c = op[1];
+        if (c.author.toLowerCase() !== user) continue;
 
-        if (data.author.toLowerCase() !== user) continue;
-
-        const ts = new Date(item[1].timestamp).getTime();
+        const ts = new Date(h[1].timestamp).getTime();
         if (ts < cutoff) continue;
 
-        if (excludedParents.includes(data.parent_author.toLowerCase())) continue;
-
-        if (data.parent_author === "") posts++;
+        if (c.parent_author === "") posts++;
         else comments++;
     }
-
-    const ratio = posts > 0 ? comments / posts : 0;
-
-    return { posts, comments, ratio };
+    return { posts, comments, ratio: posts ? comments / posts : 0 };
 }
 
-// --------------------
-// DOWNVOTES
-// --------------------
-function extractDownvotes(history, username) {
-    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const votes = {};
-    const user = username.toLowerCase();
+function downvotes(history, user) {
+    const cutoff = daysAgo(30);
+    const map = {};
 
-    for (const item of history) {
-        const op = item[1].op;
+    for (const h of history) {
+        const op = h[1].op;
         if (!op || op[0] !== "vote") continue;
 
-        const vote = op[1];
-        const ts = item[1].timestamp;
+        const v = op[1];
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
 
-        const time = new Date(ts).getTime();
-        if (time < cutoff) continue;
-
-        if (vote.weight < 0 && vote.author.toLowerCase() === user) {
-            votes[vote.voter] = {
-                count: (votes[vote.voter]?.count || 0) + 1
-            };
+        if (v.weight < 0 && v.author.toLowerCase() === user) {
+            map[v.voter] = (map[v.voter] || 0) + 1;
         }
     }
-
-    return votes;
+    return map;
 }
-// --------------------
-// OUTGOING TRANSFERS
-// --------------------
-function extractOutgoingTransfers(history, username) {
-    const user = username.toLowerCase();
 
+function outgoingTransfers(history, user) {
     return history
         .filter(h => h[1].op[0] === "transfer")
-        .map(h => ({
-            op: h[1].op[1],
-            date: h[1].timestamp
-        }))
-        .filter(t => t.op.from.toLowerCase() === user)
-        .map(t => ({
-            to: t.op.to,
-            amount: t.op.amount,
-            memo: t.op.memo || "",
-            date: t.date
-        }));
+        .map(h => h[1].op[1])
+        .filter(t => t.from.toLowerCase() === user);
 }
 
-// --------------------
-// TRANSFER SUMMARY
-// --------------------
-function summarizeTransfers(transfers) {
-    let totalHive = 0;
-    let totalHbd = 0;
+function summarizeTransfers(list) {
+    let hive = 0, hbd = 0;
     const perUser = {};
 
-    for (const t of transfers) {
-        const [amountStr, currency] = t.amount.split(" ");
-        const amount = parseFloat(amountStr);
+    for (const t of list) {
+        const [amt, cur] = t.amount.split(" ");
+        const v = parseFloat(amt);
 
-        if (currency === "HIVE") totalHive += amount;
-        if (currency === "HBD") totalHbd += amount;
+        if (cur === "HIVE") hive += v;
+        if (cur === "HBD") hbd += v;
 
-        if (!perUser[t.to]) {
-            perUser[t.to] = { totalHive: 0, totalHbd: 0 };
-        }
-
-        if (currency === "HIVE") perUser[t.to].totalHive += amount;
-        if (currency === "HBD") perUser[t.to].totalHbd += amount;
+        if (!perUser[t.to]) perUser[t.to] = { hive: 0, hbd: 0 };
+        if (cur === "HIVE") perUser[t.to].hive += v;
+        if (cur === "HBD") perUser[t.to].hbd += v;
     }
-
-    return { totalHive, totalHbd, perUser };
+    return { hive, hbd, perUser };
 }
 
-// --------------------
-// HP
-// --------------------
-async function getHP(account) {
-    const globals = await loadHiveGlobals();
-
-    const totalVestingFundHive = parseFloat(globals.total_vesting_fund_hive);
-    const totalVestingShares = parseFloat(globals.total_vesting_shares);
-
-    const vestingShares = parseFloat(account.vesting_shares);
-    const receivedShares = parseFloat(account.received_vesting_shares);
-    const delegatedShares = parseFloat(account.delegated_vesting_shares);
-
-    const userVests = vestingShares + receivedShares - delegatedShares;
-
-    const hp = userVests * (totalVestingFundHive / totalVestingShares);
-
-    return hp;
-}
-
-// --------------------
+// ----------------------------------------------------
 // MAIN
-// --------------------
+// ----------------------------------------------------
 async function checkUser() {
-    const username = document.getElementById("username").value.trim();
-    const dashboard = document.getElementById("dashboard");
+    const user = document.getElementById("username").value.trim().toLowerCase();
+    if (!user || !throttle()) return;
 
-    if (!username) return;
+    logSearch(user);
 
-    throttleSearch(username);
+    const dash = document.getElementById("dashboard");
+    dash.innerHTML = "Loading…";
 
-    dashboard.innerHTML = "Loading...";
+    const acc = await getAccount(user);
+    if (!acc) return dash.innerHTML = "Account not found";
 
-    const account = await getHiveAccount(username);
+    if (!blacklist.size) await loadBlacklist();
 
-    if (!account || !account.name) {
-        dashboard.innerHTML = "Account not found";
-        return;
-    }
+    const rep = await getReputation(user);
+    const age = Math.floor((Date.now() - new Date(acc.created)) / 86400000);
+    const hp = await getHP(acc);
+    const dHP = await getDelegatedHP(acc);
+    const dPct = hp > 0 ? (dHP / hp) * 100 : 0;
+    const isBL = blacklist.has(user);
 
-    if (!blacklist.size) {
-        await loadBlacklist();
-    }
-
-    const blacklisted = isBlacklisted(username);
-    const ageDays = getAgeDays(account.created);
-    const hp = await getHP(account);
-    const globals = await loadHiveGlobals();
-    const keData = computeKE(account, globals);
-    const reputation = await getReputation(username);
-
-    dashboard.innerHTML = `
+    dash.innerHTML = `
         <div class="grid">
+            <div class="card" id="repCard"><div class="label">Reputation</div><div class="value">${rep}</div></div>
+            <div class="card" id="ageCard"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
+            <div class="card" id="hpCard"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
 
-            <div class="card" id="repCard">
-                <div class="label">Reputation</div>
-                <div class="value" id="repValue">${reputation}</div>
-            </div>
+            <div class="card" id="delegatedCard"><div class="label">Delegated HP</div><div class="value">${dHP.toFixed(3)}</div></div>
+            <div class="card" id="delegationPctCard"><div class="label">Delegation %</div><div class="value">${dPct.toFixed(1)}%</div></div>
 
-            <div class="card" id="ageCard">
-                <div class="label">Account age (days)</div>
-                <div class="value">${Math.floor(ageDays)}</div>
-            </div>
+            <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="ratioCard"><div class="label">Comment/Post ratio</div><div class="value">Loading…</div></div>
 
-            <div class="card" id="hpCard">
-                <div class="label">Active HP</div>
-                <div class="value">${hp.toFixed(3)}</div>
-            </div>
+            <div class="card loading" id="transfersCard"><div class="label">Outgoing transfers (30d)</div><div class="value">Loading…</div></div>
+            <div class="card loading" id="downvotesCard"><div class="label">Incoming downvotes (30d)</div><div class="value">Loading…</div></div>
 
-            <div class="card loading" id="postsCard">
-                <div class="label">Posts (7d)</div>
-                <div class="value" id="posts7d">Loading…</div>
-            </div>
-
-            <div class="card loading" id="commentsCard">
-                <div class="label">Comments (7d)</div>
-                <div class="value" id="comments7d">Loading…</div>
-            </div>
-
-            <div class="card loading" id="ratioCard">
-                <div class="label">Comment/Post ratio (7d)</div>
-                <div class="value" id="ratio7d">Loading…</div>
-            </div>
-
-            <div class="card loading" id="transfersCard">
-                <div class="label">Outgoing transfers (30d)</div>
-                <div class="value">Loading…</div>
-            </div>
-
-            <div class="card loading" id="downvotesCard">
-                <div class="label">Incoming downvotes (30d)</div>
-                <div class="value">Loading…</div>
-            </div>
-
-            <div class="card" id="keCard">
-                <div class="label">Rewards/Stake Co-efficient (KE)</div>
-                <div class="value" id="keValue">${keData.krampus.toFixed(2)}</div>
-            </div>
-
-            <div class="card" id="blacklistCard">
-                <div class="label">Hivewatchers blacklist</div>
-                <div class="value">${blacklisted ? "YES" : "NO"}</div>
-            </div>
-
+            <div class="card" id="blacklistCard"><div class="label">Hivewatchers blacklist</div><div class="value">${isBL ? "YES" : "NO"}</div></div>
         </div>
 
-        <h3 style="margin-top:30px;">Outgoing transfers (30d)</h3>
+        <h3>Outgoing transfers (30d)</h3>
         <div id="transferTable"></div>
 
-        <h3 style="margin-top:30px;">Incoming downvotes (30d)</h3>
+        <h3>Incoming downvotes (30d)</h3>
         <div id="downvoteTable"></div>
     `;
 
-    // COLOR RULES
-    const repCard = document.getElementById("repCard");
-    if (reputation <= 10) repCard.className = "card danger";
-    else if (reputation < 25) repCard.className = "card warning";
-    else repCard.className = "card ok";
+    // Color rules
+    setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
+    setCard("ageCard", age, age < 31 ? "danger" : "ok");
+    setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
 
-    document.getElementById("ageCard").className =
-        "card " + (ageDays < 31 ? "danger" : "ok");
+    setCard("delegatedCard", dHP.toFixed(3), dHP > 0 ? "warning" : "ok");
+    setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
 
-    document.getElementById("hpCard").className =
-        "card " + (hp < 100 ? "danger" : "ok");
-
-    const keCard = document.getElementById("keCard");
-    if (keData.krampus < 2) keCard.className = "card ok";
-    else if (keData.krampus < 5) keCard.className = "card warning";
-    else keCard.className = "card danger";
-
-    document.getElementById("blacklistCard").className =
-        "card " + (blacklisted ? "danger" : "ok");
+    setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
 
     // HISTORY
-    const history = await getAccountHistory30d(username);
+    const hist = await getHistory30d(user);
 
-    const { posts, comments, ratio } = extractPostsAndComments7d(history, username);
-
-    document.getElementById("posts7d").innerText = posts;
-    document.getElementById("comments7d").innerText = comments;
-    document.getElementById("ratio7d").innerText = ratio.toFixed(2);
-
-    const postsCard = document.getElementById("postsCard");
-    if (posts > 10) postsCard.className = "card danger";
-    else if (posts >= 8) postsCard.className = "card warning";
-    else postsCard.className = "card ok";
-
-    const commentsCard = document.getElementById("commentsCard");
-    if (comments < 7) commentsCard.className = "card danger";
-    else if (comments < 14) commentsCard.className = "card warning";
-    else commentsCard.className = "card ok";
-
-    const ratioCard = document.getElementById("ratioCard");
-    if (ratio <= 0) ratioCard.className = "card danger";
-    else if (ratio < 5) ratioCard.className = "card warning";
-    else ratioCard.className = "card ok";
+    const pc = postsComments7d(hist, user);
+    setCard("postsCard", pc.posts, pc.posts > 10 ? "danger" : pc.posts >= 8 ? "warning" : "ok");
+    setCard("commentsCard", pc.comments, pc.comments < 7 ? "danger" : pc.comments < 14 ? "warning" : "ok");
+    setCard("ratioCard", pc.ratio.toFixed(2), pc.ratio <= 0 ? "danger" : pc.ratio < 5 ? "warning" : "ok");
 
     // TRANSFERS
-    const outgoingTransfers = extractOutgoingTransfers(history, username);
-    const summary = summarizeTransfers(outgoingTransfers);
+    const transfers = outgoingTransfers(hist, user);
+    const sum = summarizeTransfers(transfers);
 
-    const totalHive = summary.totalHive;
-    const totalHbd = summary.totalHbd;
+    const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
+    setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
 
-    const transfersCard = document.getElementById("transfersCard");
-
-    // NEW RULES:
-    // >10 HIVE OR >5 HBD = ORANJE (warning)
-    // otherwise = GREEN (ok)
-    if (totalHive > 10 || totalHbd > 5) {
-        transfersCard.className = "card warning";
-    } else {
-        transfersCard.className = "card ok";
-    }
-
-    transfersCard.querySelector(".value").innerHTML = `
-        ${totalHive.toFixed(3)} HIVE<br>
-        ${totalHbd.toFixed(3)} HBD
-    `;
-
-    if (Object.keys(summary.perUser).length > 0) {
+    if (Object.keys(sum.perUser).length) {
         document.getElementById("transferTable").innerHTML = `
             <table>
-                <tr>
-                    <th>Recipient</th>
-                    <th>Total amount (30d)</th>
-                </tr>
-
-                ${Object.entries(summary.perUser)
-                    .map(([to, data]) => {
-                        const label = EXCHANGE_ACCOUNTS.has(to.toLowerCase())
-                            ? `${to} (exchange)`
-                            : to;
-
-                        return `
-                            <tr class="danger-row">
-                                <td>${label}</td>
-                                <td>
-                                    ${data.totalHive.toFixed(3)} HIVE<br>
-                                    ${data.totalHbd.toFixed(3)} HBD
-                                </td>
-                            </tr>
-                        `;
-                    }).join("")}
+                <tr><th>Recipient</th><th>Total</th></tr>
+                ${Object.entries(sum.perUser).map(([to, v]) => `
+                    <tr class="danger-row">
+                        <td>${EXCHANGES.has(to.toLowerCase()) ? to + " (exchange)" : to}</td>
+                        <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
+                    </tr>
+                `).join("")}
             </table>
         `;
     }
 
     // DOWNVOTES
-    const downvotes = extractDownvotes(history, username);
-    const totalDownvotes = Object.values(downvotes)
-        .reduce((a, b) => a + (b.count || 0), 0);
+    const dv = downvotes(hist, user);
+    const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
 
-    const downvotesCard = document.getElementById("downvotesCard");
-    downvotesCard.className = "card " + (totalDownvotes > 0 ? "danger" : "ok");
-    downvotesCard.querySelector(".value").innerText = totalDownvotes;
+    const dvStatus = totalDV >= 10 ? "danger" : totalDV > 0 ? "warning" : "ok";
+    setCard("downvotesCard", totalDV, dvStatus);
 
-    if (totalDownvotes > 0) {
+    if (totalDV > 0) {
         document.getElementById("downvoteTable").innerHTML = `
             <table>
-                <tr>
-                    <th>User</th>
-                    <th>Count (30d)</th>
-                </tr>
-
-                ${Object.entries(downvotes)
-                    .sort((a, b) => b[1].count - a[1].count)
-                    .map(([user, data]) => `
-                        <tr class="danger-row">
-                            <td>${user}</td>
-                            <td>${data.count}</td>
-                        </tr>
-                    `).join("")}
+                <tr><th>User</th><th>Count</th></tr>
+                ${Object.entries(dv).sort((a, b) => b[1] - a[1]).map(([u, c]) => `
+                    <tr class="danger-row"><td>${u}</td><td>${c}</td></tr>
+                `).join("")}
             </table>
         `;
     }
 }
 
-// ENTER KEY SUPPORT
+// ENTER KEY
 document.addEventListener("DOMContentLoaded", () => {
-    const input = document.getElementById("username");
-    if (input) {
-        input.addEventListener("keydown", e => {
-            if (e.key === "Enter") {
-                checkUser();
-            }
-        });
-    }
+    document.getElementById("username").addEventListener("keydown", e => {
+        if (e.key === "Enter") checkUser();
+    });
 });
