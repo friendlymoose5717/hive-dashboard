@@ -7,62 +7,20 @@ let lastSearch = 0;
 
 // Exchange accounts
 const EXCHANGES = new Set([
-    "deepcrypto8",
-    "binance-hot",
-    "poloniex",
-    "bittrex",
-    "upbitsteem",
-    "hot.dunamu",
-    "hot1.dunamu",
-    "hot2.dunamu",
-    "hot3.dunamu",
-    "hot4.dunamu",
-    "hot5.dunamu",
-    "bithumbsend2",
-    "bithumbrecv2",
-    "bt20hivedkdnel",
-    "blocktrades",
-    "huobi-withdrawal",
-    "huobi-pro",
-    "user.dunamu",
-    "cold.dunamu",
-    "gateiodeposit",
-    "indodaxofficial",
-    "orinoco",
-    "xbts",
-    "ionomy",
-    "cryptex24",
-    "upbitshotwallet1",
-    "upbitsusers",
-    "xbtsio",
-    "mxchive",
-    "bdhivesteem"
+    "deepcrypto8","binance-hot","poloniex","bittrex","upbitsteem",
+    "hot.dunamu","hot1.dunamu","hot2.dunamu","hot3.dunamu","hot4.dunamu","hot5.dunamu",
+    "bithumbsend2","bithumbrecv2","bt20hivedkdnel","blocktrades","huobi-withdrawal",
+    "huobi-pro","user.dunamu","cold.dunamu","gateiodeposit","indodaxofficial",
+    "orinoco","xbts","ionomy","cryptex24","upbitshotwallet1","upbitsusers","xbtsio",
+    "mxchive","bdhivesteem"
 ]);
 
 // Swap / DEX services
 const DEX_SERVICES = new Set([
-    "honey-swap",
-    "hiveswap",
-    "hive-engine",
-    "leodex",
-    "uswap",
-    "uswap.hbd",
-    "keychain.swap",
-    "graphene-swap",
-    "swap.app",
-    "capybaraexchange",
-    "sw4p",
-    "p-hbd",
-    "bnb-hbd",
-    "logicswap",
-    "swapbase",
-    "demotruktrade",
-    "chaoxing",
-    "market.backup",
-    "swaplane",
-    "swaplane2",
-    "quikswap",
-    "happycustomer"
+    "honey-swap","hiveswap","hive-engine","leodex","uswap","uswap.hbd",
+    "keychain.swap","graphene-swap","swap.app","capybaraexchange","sw4p",
+    "p-hbd","bnb-hbd","logicswap","swapbase","demotruktrade","chaoxing",
+    "market.backup","swaplane","swaplane2","quikswap","happycustomer"
 ]);
 
 // ----------------------------------------------------
@@ -282,47 +240,6 @@ function summarizeTransfers(list) {
 }
 
 // ----------------------------------------------------
-// PENDING PAYOUTS (ASYNC)
-// ----------------------------------------------------
-async function getPendingPayouts(user) {
-    const posts = await api("bridge.get_account_posts", [{
-        sort: "payout",
-        account: user,
-        limit: 100,
-        observer: user
-    }]);
-
-    let hp = 0;
-    let hbd = 0;
-
-    for (const p of posts) {
-        if (p.pending_payout_hp) hp += parseFloat(p.pending_payout_hp);
-        if (p.pending_payout_hbd) hbd += parseFloat(p.pending_payout_hbd);
-    }
-
-    return { hp, hbd };
-}
-
-// ----------------------------------------------------
-// KE — KRAMPUS EFFICIENCY
-// ----------------------------------------------------
-async function computeKE(acc) {
-    const g = await loadGlobals();
-
-    const authorRewards = acc.posting_rewards / 1000;
-    const curationRewards = acc.curation_rewards / 1000;
-
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-    const vesting = parseFloat(acc.vesting_shares);
-
-    const hpBalance = shares ? (fund * vesting) / shares : 0;
-
-    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
-
-    return { authorRewards, curationRewards, hpBalance, krampus };
-}
-// ----------------------------------------------------
 // MAIN
 // ----------------------------------------------------
 async function checkUser() {
@@ -359,11 +276,6 @@ async function checkUser() {
 
              <div class="card" id="keCard"><div class="label">KE (Krampus Efficiency)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
 
-             <div class="card loading" id="pendingCard">
-                 <div class="label">Pending payouts (7d)</div>
-                 <div class="value">Loading…</div>
-             </div>
-
              <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
              <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
              <div class="card loading" id="ratioCard"><div class="label">Comment/Post ratio</div><div class="value">Loading…</div></div>
@@ -398,18 +310,6 @@ async function checkUser() {
         "danger";
 
     setCard("keCard", ke.krampus.toFixed(4), keStatus);
-
-    // ----------------------------------------------------
-    // ASYNC PENDING PAYOUTS (non-blocking)
-    // ----------------------------------------------------
-    getPendingPayouts(user).then(pending => {
-        const status = pending.hp > 200 ? "warning" : "ok";
-        setCard(
-            "pendingCard",
-            `${pending.hp.toFixed(3)} HP<br>${pending.hbd.toFixed(3)} HBD`,
-            status
-        );
-    });
 
     // HISTORY
     const hist = await getHistory30d(user);
@@ -479,4 +379,3 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.key === "Enter") checkUser();
     });
 });
-
