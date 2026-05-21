@@ -13,6 +13,25 @@ const EXCHANGES = new Set(["deepcrypto8","binance-hot","poloniex","bittrex","upb
     "orinoco","xbts","ionomy","cryptex24","upbitshotwallet1","upbitsusers","xbtsio",
     "mxchive","bdhivesteem"]);
 
+// Tooltops
+const TOOLTIPS = {
+  repCard: "Reputation score based on community voting behavior.",
+  ageCard: "Number of days since the account was created.",
+  hpCard: "Hive Power: your effective stake used for voting and RC.",
+  delegatedCard: "Amount of HP you have delegated to other accounts.",
+  delegationPctCard: "Percentage of your total HP that is delegated.",
+  postsCard: "Number of posts you created in the last 7 days.",
+  commentsCard: "Number of comments you made in the last 7 days.",
+  ratioCard: "Comments divided by posts. Higher means more engagement.",
+  transfersCard: "Total outgoing transfers in the last 30 days.",
+  downvotesCard: "Number of downvotes received in the last 30 days.",
+  mutedCard: "Number of accounts that have muted you.",
+  keCard: "Krampus Efficiency: rewards earned relative to your stake.",
+  blacklistCard: "Indicates whether this account is on the Hivewatchers blacklist.",
+  pendingRewardsCard: "Pending author rewards that will be paid out soon.",
+  author7dCard: "Total author rewards earned in the last 7 days (HIVE equivalent).",
+  curation7dCard: "Total curation rewards earned in the last 7 days."
+};
  
 
 // ----------------------------------------------------
@@ -52,6 +71,13 @@ return delegs.map(d => ({
 to: d.delegatee,
 hp: parseFloat(d.vesting_shares) * (fund / shares)
 }));
+}
+
+function applyTooltips() {
+  for (const [id, text] of Object.entries(TOOLTIPS)) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute("title", text);
+  }
 }
 
 // ----------------------------------------------------
@@ -304,6 +330,8 @@ dash.innerHTML = `
 
 `;
 
+applyTooltips();
+    
 // Color rules
 setCard("repCard", rep, rep <= 10 ? "danger" : rep < 25 ? "warning" : "ok");
 setCard("ageCard", age, age < 31 ? "danger" : "ok");
