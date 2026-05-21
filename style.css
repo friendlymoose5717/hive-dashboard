@@ -10,22 +10,15 @@ body {
 }
 
 .container {
-    max-width: 700px;
+    max-width: 900px;
     margin: auto;
 }
 
 /* ----------------------------------------------------
    SEARCH BAR
 ---------------------------------------------------- */
-.search-box {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-/* Blue input field */
 input#username {
-    flex: 1;
+    width: 70%;
     padding: 12px;
     border-radius: 8px;
     border: 1px solid #3b82f6;
@@ -40,33 +33,48 @@ input#username::placeholder {
 }
 
 input#username:focus {
-    background: #1e40af;      /* iets lichter blauw */
+    background: #1e40af;
     border-color: #60a5fa;
     box-shadow: 0 0 8px rgba(96,165,250,0.4);
 }
 
-/* Blue button */
 button {
-    padding: 12px 20px;
-    border-radius: 8px;
+    padding: 12px 16px;
     border: none;
-    background: #3b82f6;      /* blauw */
+    border-radius: 8px;
+    background: #3b82f6;
     color: white;
     cursor: pointer;
+    margin-left: 8px;
     transition: 0.2s;
 }
 
 button:hover {
-    background: #2563eb;      /* donkerder blauw */
+    background: #2563eb;
 }
 
 /* ----------------------------------------------------
-   CARDS
+   GRID + CARDS
 ---------------------------------------------------- */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 25px;
+}
+
+@media (max-width: 900px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+}
+
 .card {
     background: #1f2937;
-    padding: 20px;
     border-radius: 12px;
+    padding: 15px;
     border: 1px solid #374151;
     transition: 0.25s;
 }
@@ -104,7 +112,7 @@ button:hover {
 }
 
 /* ----------------------------------------------------
-   TABLES — BLUE THEME (Option A)
+   TABLES — BLUE THEME
 ---------------------------------------------------- */
 .data-table {
     width: 100%;
@@ -147,15 +155,7 @@ button:hover {
 /* ----------------------------------------------------
    MISC
 ---------------------------------------------------- */
-.stat-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid #374151;
-}
-
 .hidden { display: none; }
-
 .error { color: #f87171; }
 .good { color: #4ade80; }
 .bad { color: #f87171; }
