@@ -372,15 +372,25 @@ const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
 setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
 
 if (Object.keys(sum.perUser).length) {
-document.getElementById("transferTable").innerHTML = `
-        <table>
-            <tr><th>Recipient</th><th>Total</th></tr>
-            ${Object.entries(sum.perUser).map(([to, v]) => `
-                <tr class="danger-row">
-                    <td>${EXCHANGES.has(to.toLowerCase()) ? to + " (exchange)" : to}</td>
-                    <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
+    document.getElementById("transferTable").innerHTML = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th colspan="2">Outgoing transfers (30d)</th>
                 </tr>
-            `).join("")}
+                <tr>
+                    <th>Recipient</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Object.entries(sum.perUser).map(([to, v]) => `
+                    <tr class="danger-row">
+                        <td>${EXCHANGES.has(to.toLowerCase()) ? to + " (exchange)" : to}</td>
+                        <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
+                    </tr>
+                `).join("")}
+            </tbody>
         </table>
     `;
 }
