@@ -155,8 +155,11 @@ async function loadBlacklist() {
 // ----------------------------------------------------
 // ACCOUNT DATA
 // ----------------------------------------------------
-const getAccount = u => api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
-const getReputation = u => api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
+const getAccount = u =>
+    api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
+
+const getReputation = u =>
+    api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
 
 async function getHP(acc) {
     const g = await loadGlobals();
@@ -319,7 +322,6 @@ async function computeKE(acc) {
 
     return { authorRewards, curationRewards, hpBalance, krampus };
 }
-
 // ----------------------------------------------------
 // MAIN
 // ----------------------------------------------------
@@ -464,4 +466,17 @@ async function checkUser() {
              <table>
                  <tr><th>User</th><th>Count</th></tr>
                  ${Object.entries(dv).sort((a, b) => b[1] - a[1]).map(([u, c]) => `
-                     <tr class="danger-row"><td>${u}</td><td>${c}</td></
+                     <tr class="danger-row"><td>${u}</td><td>${c}</td></tr>
+                 `).join("")}
+             </table>
+         `;
+    }
+}
+
+// ENTER KEY
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("username").addEventListener("keydown", e => {
+        if (e.key === "Enter") checkUser();
+    });
+});
+
