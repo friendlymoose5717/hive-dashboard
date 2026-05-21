@@ -47,6 +47,7 @@
             color: #e5e7eb;
             outline: none;
             transition: 0.2s;
+            margin-bottom: 25px; /* extra ruimte */
         }
 
         input#username::placeholder {
@@ -81,7 +82,8 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 15px;
-            margin-top: 25px;
+            margin-top: 35px;     /* extra ruimte */
+            margin-bottom: 35px;  /* extra ruimte */
         }
 
         @media (max-width: 900px) {
@@ -132,68 +134,58 @@
             font-weight: bold;
         }
 
-
-
         /* ----------------------------------------------------
-           MISC
+           TABLES — COOL DARK THEME (UPDATED)
         ---------------------------------------------------- */
-        .danger-row {
-            background: #3f0d0d;
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #0d1628;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 35px;      /* extra ruimte */
+            margin-bottom: 35px;   /* extra ruimte */
+            box-shadow: 0 0 14px rgba(0,0,0,0.45);
         }
 
-        /* ----------------------------------------------------
-           TABLES — COOL DARK THEME
-        ---------------------------------------------------- */
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #0d1628;
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 20px;
-    box-shadow: 0 0 14px rgba(0,0,0,0.45);
-}
+        /* HEADER ROW */
+        .data-table thead th {
+            background: #1b2b4a;
+            color: #e5e7eb;
+            padding: 12px;
+            font-size: 1.1em;
+            text-align: left;
+            border-bottom: 1px solid #2c3e5f;
+        }
 
-/* HEADER ROW */
-.data-table thead th {
-    background: #1b2b4a;
-    color: #e5e7eb;
-    padding: 12px;
-    font-size: 1.1em;
-    text-align: left;
-    border-bottom: 1px solid #2c3e5f;
-}
+        /* BODY CELLS */
+        .data-table td,
+        .data-table th {
+            padding: 10px 12px;
+            border-bottom: 1px solid #1a2438;
+        }
 
-/* BODY CELLS */
-.data-table td,
-.data-table th {
-    padding: 10px 12px;
-    border-bottom: 1px solid #1a2438;
-}
+        /* ODD ROWS */
+        .data-table tbody tr:nth-child(odd) {
+            background: #111c30;
+        }
 
-/* ODD ROWS */
-.data-table tbody tr:nth-child(odd) {
-    background: #111c30;
-}
+        /* EVEN ROWS */
+        .data-table tbody tr:nth-child(even) {
+            background: #162238;
+        }
 
-/* EVEN ROWS */
-.data-table tbody tr:nth-child(even) {
-    background: #162238;
-}
+        /* HOVER */
+        .data-table tbody tr:hover {
+            background: #1f2f4a;
+        }
 
-/* HOVER */
-.data-table tbody tr:hover {
-    background: #1f2f4a;
-}
-
-/* DANGER ROW — amber ipv rood */
-.data-table .danger-row td {
-    background: #3a2a12;
-    color: #fbbf24;
-    font-weight: 600;
-}
-
-        
+        /* DANGER ROW — now light blue instead of red/brown */
+        .data-table .danger-row td {
+            background: #243556;   /* iets lichter blauw */
+            color: #cbd5e1;
+            font-weight: 600;
+        }
     </style>
 </head>
 
@@ -244,7 +236,7 @@
         <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg"
              alt="Discord"
              style="width:20px; height:20px; filter:invert(60%) sepia(20%) saturate(800%) hue-rotate(200deg);">
-        For questions or suggestions; Join our Discord
+        Join our Discord
     </a>
 
 </footer>
