@@ -140,7 +140,7 @@ async function getDelegatedHP(acc) {
 }
 
 // ----------------------------------------------------
-// HISTORY (with limit for speed)
+// HISTORY (FAST VERSION)
 // ----------------------------------------------------
 async function getHistory30d(user) {
     const limit = 1000;
@@ -149,7 +149,7 @@ async function getHistory30d(user) {
     const all = [];
     let batches = 0;
 
-    while (batches < 2) { // max 2 batches → faster
+    while (batches < 2) {
         const batch = await api("condenser_api.get_account_history", [user, from, limit]);
         if (!batch?.length) break;
 
@@ -158,6 +158,7 @@ async function getHistory30d(user) {
             if (ts < cutoff) return all;
             all.push(h);
         }
+
         from = batch[0][0] - 1;
         batches++;
     }
@@ -241,27 +242,6 @@ function summarizeTransfers(list) {
     }
     return { hive, hbd, perUser };
 }
-
-// ----------------------------------------------------
-// KE — KRAMPUS EFFICIENCY
-// ----------------------------------------------------
-async function computeKE(acc) {
-    const g = await loadGlobals();
-
-    const authorRewards = acc.posting_rewards / 1000;
-    const curationRewards = acc.curation_rewards / 1000;
-
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-    const vesting = parseFloat(acc.vesting_shares);
-
-    const hpBalance = shares ? (fund * vesting) / shares : 0;
-
-    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
-
-    return { authorRewards, curationRewards, hpBalance, krampus };
-}
-
 // ----------------------------------------------------
 // MAIN
 // ----------------------------------------------------
@@ -326,7 +306,6 @@ async function checkUser() {
 
     setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
 
-    // KE color rules
     const keStatus =
         ke.krampus < 2 ? "ok" :
         ke.krampus < 5 ? "warning" :
@@ -397,15 +376,23 @@ async function checkUser() {
 }
 
 // ----------------------------------------------------
-// URL USER LOADER
+// URL USER LOADER (FIXED VERSION)
 // ----------------------------------------------------
 function getUserFromURL() {
-    const parts = window.location.pathname.split("/");
-    const last = parts.pop() || parts.pop(); // last non-empty segment
-    return last && last.length > 0 ? last.toLowerCase() : null;
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    if (parts.length === 0) return null;
+
+    const last = parts[parts.length - 1].toLowerCase();
+
+    // Ignore GitHub Pages project folder
+    if (last === "hive-dashboard") return null;
+
+    return last;
 }
 
-// ENTER KEY + AUTO-LOAD FROM URL
+// ----------------------------------------------------
+// ENTER KEY + AUTOLOAD
+// ----------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
     const input = document.getElementById("username");
 
