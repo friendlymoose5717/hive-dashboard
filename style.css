@@ -1,7 +1,10 @@
+/* ----------------------------------------------------
+   GLOBAL
+---------------------------------------------------- */
 body {
     font-family: Arial, sans-serif;
     background: #111827;
-    color: white;
+    color: #e5e7eb;
     margin: 0;
     padding: 40px;
 }
@@ -11,34 +14,139 @@ body {
     margin: auto;
 }
 
+/* ----------------------------------------------------
+   SEARCH BAR
+---------------------------------------------------- */
 .search-box {
     display: flex;
     gap: 10px;
     margin-bottom: 20px;
 }
 
-input {
+/* Blue input field */
+input#username {
     flex: 1;
     padding: 12px;
     border-radius: 8px;
-    border: none;
+    border: 1px solid #3b82f6;
+    background: #1e3a8a;      /* helder blauw */
+    color: #e5e7eb;
+    outline: none;
+    transition: 0.2s;
 }
 
+input#username::placeholder {
+    color: #cbd5e1;
+}
+
+input#username:focus {
+    background: #1e40af;      /* iets lichter blauw */
+    border-color: #60a5fa;
+    box-shadow: 0 0 8px rgba(96,165,250,0.4);
+}
+
+/* Blue button */
 button {
     padding: 12px 20px;
     border-radius: 8px;
     border: none;
-    background: #3b82f6;
+    background: #3b82f6;      /* blauw */
     color: white;
     cursor: pointer;
+    transition: 0.2s;
 }
 
+button:hover {
+    background: #2563eb;      /* donkerder blauw */
+}
+
+/* ----------------------------------------------------
+   CARDS
+---------------------------------------------------- */
 .card {
     background: #1f2937;
     padding: 20px;
     border-radius: 12px;
+    border: 1px solid #374151;
+    transition: 0.25s;
 }
 
+.card.ok {
+    background: #064e3b;
+    border-color: #10b981;
+}
+
+.card.warning {
+    background: #4a3a00;
+    border-color: #f59e0b;
+}
+
+.card.danger {
+    background: #7f1d1d;
+    border-color: #ef4444;
+}
+
+.card.loading {
+    background: #1f2937;
+    border-color: #374151;
+    opacity: 0.6;
+}
+
+.label {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.value {
+    font-size: 22px;
+    margin-top: 6px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------
+   TABLES — BLUE THEME (Option A)
+---------------------------------------------------- */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #0f172a;          /* donkerblauw */
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 20px;
+    box-shadow: 0 0 14px rgba(0,0,0,0.45);
+}
+
+.data-table thead th {
+    background: #1e3a8a;          /* helder blauw */
+    color: #e5e7eb;
+    padding: 12px;
+    font-size: 1.1em;
+    text-align: left;
+    border-bottom: 1px solid #334155;
+}
+
+.data-table td,
+.data-table th {
+    padding: 10px 12px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.data-table tr:nth-child(even) {
+    background: #1e293b;          /* blauwgrijs */
+}
+
+.data-table tr:hover {
+    background: #273449;          /* iets lichter */
+}
+
+.data-table .danger-row td {
+    color: #f87171;
+    font-weight: 600;
+}
+
+/* ----------------------------------------------------
+   MISC
+---------------------------------------------------- */
 .stat-row {
     display: flex;
     justify-content: space-between;
@@ -51,41 +159,3 @@ button {
 .error { color: #f87171; }
 .good { color: #4ade80; }
 .bad { color: #f87171; }
-
-/* --- TABLES --- */
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #1e1e1e;              /* donker vlak */
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 20px;
-    box-shadow: 0 0 14px rgba(0,0,0,0.45);
-}
-
-.data-table thead th {
-    background: #374151;              /* iets lichter dan card background */
-    color: #fff;
-    padding: 12px;
-    font-size: 1.1em;
-    text-align: left;
-    border-bottom: 1px solid #4b5563;
-}
-
-.data-table td,
-.data-table th {
-    padding: 10px 12px;
-    border-bottom: 1px solid #4b5563;
-}
-
-.data-table tr:nth-child(even) {
-    background: #252f3f;              /* subtiel zebra effect */
-}
-
-.data-table tr:hover {
-    background: #2d3748;              /* hover highlight */
-}
-
-.data-table .danger-row td {
-    color: #f87171;                   /* rood accent */
