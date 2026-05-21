@@ -6,7 +6,14 @@ let globals = null;
 let lastSearch = 0;
 
 // Exchange accounts
-const EXCHANGES = new Set(["binance-hot", "orinoco", "mxchive", "bdhivesteem"]);
+const EXCHANGES = new Set(["deepcrypto8","binance-hot","poloniex","bittrex","upbitsteem",
+    "hot.dunamu","hot1.dunamu","hot2.dunamu","hot3.dunamu","hot4.dunamu","hot5.dunamu",
+    "bithumbsend2","bithumbrecv2","bt20hivedkdnel","blocktrades","huobi-withdrawal",
+    "huobi-pro","user.dunamu","cold.dunamu","gateiodeposit","indodaxofficial",
+    "orinoco","xbts","ionomy","cryptex24","upbitshotwallet1","upbitsusers","xbtsio",
+    "mxchive","bdhivesteem"]);
+
+ 
 
 // ----------------------------------------------------
 // HELPERS
