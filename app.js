@@ -403,16 +403,31 @@ const dvStatus = totalDV >= 10 ? "danger" : totalDV > 0 ? "warning" : "ok";
 setCard("downvotesCard", totalDV, dvStatus);
 
 if (totalDV > 0) {
-document.getElementById("downvoteTable").innerHTML = `
-        <table>
-            <tr><th>User</th><th>Count</th></tr>
-            ${Object.entries(dv).sort((a, b) => b[1] - a[1]).map(([u, c]) => `
-                <tr class="danger-row"><td>${u}</td><td>${c}</td></tr>
-            `).join("")}
+    document.getElementById("downvoteTable").innerHTML = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th colspan="2">Incoming downvotes (30d)</th>
+                </tr>
+                <tr>
+                    <th>User</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Object.entries(dv)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([u, c]) => `
+                        <tr class="danger-row">
+                            <td>${u}</td>
+                            <td>${c}</td>
+                        </tr>
+                    `).join("")}
+            </tbody>
         </table>
     `;
 }
-}
+
 
 // ENTER KEY
 document.addEventListener("DOMContentLoaded", () => {
