@@ -321,10 +321,10 @@ dash.innerHTML = `
         <div class="card" id="blacklistCard"><div class="label">Hivewatchers blacklist</div><div class="value">${isBL ? "YES" : "NO"}</div></div>
     </div>
 
-    <h3>Outgoing transfers (30d)</h3>
+
     <div id="transferTable"></div>
 
-    <h3>Incoming downvotes (30d)</h3>
+
     <div id="downvoteTable"></div>
 
 
