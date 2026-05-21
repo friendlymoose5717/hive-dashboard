@@ -428,10 +428,9 @@ if (totalDV > 0) {
     `;
 }
 
-
-// ENTER KEY
-document.addEventListener("DOMContentLoaded", () => {
+// INPUT + BUTTON EVENTS
 document.getElementById("username").addEventListener("keydown", e => {
-if (e.key === "Enter") checkUser();
+    if (e.key === "Enter") checkUser();
 });
-});
+
+document.getElementById("checkBtn").addEventListener("click", checkUser);
