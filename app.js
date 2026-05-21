@@ -24,19 +24,25 @@ const DEX_SERVICES = new Set([
 ]);
 
 // ----------------------------------------------------
-// HELPERS
+// SAFE API WRAPPER WITH TIMEOUT
 // ----------------------------------------------------
-async function api(method, params = []) {
+async function api(method, params = [], timeout = 6000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+
     try {
         const r = await fetch("https://api.hive.blog", {
             method: "POST",
+            signal: controller.signal,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
         });
+
+        clearTimeout(timer);
         const j = await r.json();
         return j.result;
     } catch (e) {
-        console.error("API error:", method, e);
+        console.error("API timeout/error:", method, e);
         return null;
     }
 }
@@ -147,30 +153,23 @@ async function getDelegatedHP(acc) {
 }
 
 // ----------------------------------------------------
-// FAST HISTORY LOADER
+// FAST HISTORY LOADER (1 batch max)
 // ----------------------------------------------------
 async function getHistory30d(user) {
     const limit = 1000;
-    let from = -1;
+    const batch = await api("condenser_api.get_account_history", [user, -1, limit]);
+
+    if (!batch) return [];
+
     const cutoff = daysAgo(30);
-    const all = [];
-    let batches = 0;
+    const out = [];
 
-    while (batches < 2) {
-        const batch = await api("condenser_api.get_account_history", [user, from, limit]);
-        if (!batch?.length) break;
-
-        for (const h of batch) {
-            const ts = new Date(h[1].timestamp).getTime();
-            if (ts < cutoff) return all;
-            all.push(h);
-        }
-
-        from = batch[0][0] - 1;
-        batches++;
+    for (const h of batch) {
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts >= cutoff) out.push(h);
     }
 
-    return all;
+    return out;
 }
 
 // ----------------------------------------------------
@@ -250,6 +249,26 @@ function summarizeTransfers(list) {
     }
 
     return { hive, hbd, perUser };
+}
+
+// ----------------------------------------------------
+// KE — KRAMPUS EFFICIENCY
+// ----------------------------------------------------
+async function computeKE(acc) {
+    const g = await loadGlobals();
+    if (!g) return { authorRewards: 0, curationRewards: 0, hpBalance: 0, krampus: 0 };
+
+    const authorRewards = acc.posting_rewards / 1000;
+    const curationRewards = acc.curation_rewards / 1000;
+
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+    const vesting = parseFloat(acc.vesting_shares);
+
+    const hpBalance = shares ? (fund * vesting) / shares : 0;
+    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : 0;
+
+    return { authorRewards, curationRewards, hpBalance, krampus };
 }
 // ----------------------------------------------------
 // MAIN
@@ -385,33 +404,10 @@ async function checkUser() {
 }
 
 // ----------------------------------------------------
-// URL USER LOADER
-// ----------------------------------------------------
-function getUserFromURL() {
-    const parts = window.location.pathname.split("/").filter(Boolean);
-    if (parts.length === 0) return null;
-
-    const last = parts[parts.length - 1].toLowerCase();
-
-    // Ignore GitHub Pages project folder
-    if (last === "hive-dashboard") return null;
-
-    return last;
-}
-
-// ----------------------------------------------------
-// ENTER KEY + AUTOLOAD
+// ENTER KEY
 // ----------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
-    const input = document.getElementById("username");
-
-    input.addEventListener("keydown", e => {
+    document.getElementById("username").addEventListener("keydown", e => {
         if (e.key === "Enter") checkUser();
     });
-
-    const urlUser = getUserFromURL();
-    if (urlUser) {
-        input.value = urlUser;
-        checkUser();
-    }
 });
