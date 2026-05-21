@@ -27,11 +27,11 @@ const DEX_SERVICES = new Set([
 // HELPERS
 // ----------------------------------------------------
 const api = (method, params = []) =>
-fetch("https://api.hive.blog", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
-}).then(r => r.json()).then(j => j.result);
+    fetch("https://api.hive.blog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 })
+    }).then(r => r.json()).then(j => j.result);
 
 const daysAgo = d => Date.now() - d * 86400000;
 
@@ -140,15 +140,16 @@ async function getDelegatedHP(acc) {
 }
 
 // ----------------------------------------------------
-// HISTORY
+// HISTORY (with limit for speed)
 // ----------------------------------------------------
 async function getHistory30d(user) {
     const limit = 1000;
     let from = -1;
     const cutoff = daysAgo(30);
     const all = [];
+    let batches = 0;
 
-    while (true) {
+    while (batches < 2) { // max 2 batches → faster
         const batch = await api("condenser_api.get_account_history", [user, from, limit]);
         if (!batch?.length) break;
 
@@ -158,7 +159,9 @@ async function getHistory30d(user) {
             all.push(h);
         }
         from = batch[0][0] - 1;
+        batches++;
     }
+
     return all;
 }
 
@@ -237,6 +240,26 @@ function summarizeTransfers(list) {
         if (cur === "HBD") perUser[t.to].hbd += v;
     }
     return { hive, hbd, perUser };
+}
+
+// ----------------------------------------------------
+// KE — KRAMPUS EFFICIENCY
+// ----------------------------------------------------
+async function computeKE(acc) {
+    const g = await loadGlobals();
+
+    const authorRewards = acc.posting_rewards / 1000;
+    const curationRewards = acc.curation_rewards / 1000;
+
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+    const vesting = parseFloat(acc.vesting_shares);
+
+    const hpBalance = shares ? (fund * vesting) / shares : 0;
+
+    const krampus = hpBalance ? (authorRewards + curationRewards) / hpBalance : -1;
+
+    return { authorRewards, curationRewards, hpBalance, krampus };
 }
 
 // ----------------------------------------------------
@@ -373,9 +396,26 @@ async function checkUser() {
     }
 }
 
-// ENTER KEY
+// ----------------------------------------------------
+// URL USER LOADER
+// ----------------------------------------------------
+function getUserFromURL() {
+    const parts = window.location.pathname.split("/");
+    const last = parts.pop() || parts.pop(); // last non-empty segment
+    return last && last.length > 0 ? last.toLowerCase() : null;
+}
+
+// ENTER KEY + AUTO-LOAD FROM URL
 document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("username").addEventListener("keydown", e => {
+    const input = document.getElementById("username");
+
+    input.addEventListener("keydown", e => {
         if (e.key === "Enter") checkUser();
     });
+
+    const urlUser = getUserFromURL();
+    if (urlUser) {
+        input.value = urlUser;
+        checkUser();
+    }
 });
