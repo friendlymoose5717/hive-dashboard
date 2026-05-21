@@ -279,7 +279,7 @@ function summarizeTransfers(list) {
 }
 
 // ----------------------------------------------------
-// PENDING PAYOUTS
+// PENDING PAYOUTS (ASYNC)
 // ----------------------------------------------------
 async function getPendingPayouts(user) {
     const posts = await api("bridge.get_account_posts", [{
@@ -345,7 +345,6 @@ async function checkUser() {
     const isBL = blacklist.has(user);
 
     const ke = await computeKE(acc);
-    const pending = await getPendingPayouts(user);
 
     dash.innerHTML = `
          <div class="grid">
@@ -358,7 +357,10 @@ async function checkUser() {
 
              <div class="card" id="keCard"><div class="label">KE (Krampus Efficiency)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
 
-             <div class="card" id="pendingCard"><div class="label">Pending payouts (7d)</div><div class="value">${pending.hp.toFixed(3)} HP<br>${pending.hbd.toFixed(3)} HBD</div></div>
+             <div class="card loading" id="pendingCard">
+                 <div class="label">Pending payouts (7d)</div>
+                 <div class="value">Loading…</div>
+             </div>
 
              <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
              <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
@@ -394,6 +396,18 @@ async function checkUser() {
         "danger";
 
     setCard("keCard", ke.krampus.toFixed(4), keStatus);
+
+    // ----------------------------------------------------
+    // ASYNC PENDING PAYOUTS (non-blocking)
+    // ----------------------------------------------------
+    getPendingPayouts(user).then(pending => {
+        const status = pending.hp > 200 ? "warning" : "ok";
+        setCard(
+            "pendingCard",
+            `${pending.hp.toFixed(3)} HP<br>${pending.hbd.toFixed(3)} HBD`,
+            status
+        );
+    });
 
     // HISTORY
     const hist = await getHistory30d(user);
@@ -450,16 +464,4 @@ async function checkUser() {
              <table>
                  <tr><th>User</th><th>Count</th></tr>
                  ${Object.entries(dv).sort((a, b) => b[1] - a[1]).map(([u, c]) => `
-                     <tr class="danger-row"><td>${u}</td><td>${c}</td></tr>
-                 `).join("")}
-             </table>
-         `;
-    }
-}
-
-// ENTER KEY
-document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("username").addEventListener("keydown", e => {
-        if (e.key === "Enter") checkUser();
-    });
-});
+                     <tr class="danger-row"><td>${u}</td><td>${c}</td></
