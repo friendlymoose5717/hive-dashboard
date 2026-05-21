@@ -434,3 +434,6 @@ document.getElementById("username").addEventListener("keydown", e => {
 });
 
 document.getElementById("checkBtn").addEventListener("click", checkUser);
+
+// Make checkUser globally accessible
+window.checkUser
