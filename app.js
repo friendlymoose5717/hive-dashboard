@@ -15,21 +15,21 @@ const EXCHANGES = new Set(["deepcrypto8","binance-hot","poloniex","bittrex","upb
 
 // Tooltops
 const TOOLTIPS = {
-  repCard: "Reputation score based on community voting behavior.",
+  repCard: "Reputation score based on upvotes received.",
   ageCard: "Number of days since the account was created.",
-  hpCard: "Hive Power: your effective stake used for voting and RC.",
-  delegatedCard: "Amount of HP you have delegated to other accounts.",
-  delegationPctCard: "Percentage of your total HP that is delegated.",
-  postsCard: "Number of posts you created in the last 7 days.",
-  commentsCard: "Number of comments you made in the last 7 days.",
+  hpCard: "Hive Power: your effective stake used for voting. ",
+  delegatedCard: "Amount of HP delegated to other accounts.",
+  delegationPctCard: "Percentage of total HP that is delegated.",
+  postsCard: "Number of posts created in the last 7 days.",
+  commentsCard: "Number of comments made in the last 7 days.",
   ratioCard: "Comments divided by posts. Higher means more engagement.",
   transfersCard: "Total outgoing transfers in the last 30 days.",
   downvotesCard: "Number of downvotes received in the last 30 days.",
-  mutedCard: "Number of accounts that have muted you.",
-  keCard: "Krampus Efficiency: rewards earned relative to your stake.",
+  mutedCard: "Number of people that have muted this account.",
+  keCard: "Krampus Efficiency: How much of the earned rewards are withdrawn. < 1 = more staked than earned, > 1 = more rewards extracted.",
   blacklistCard: "Indicates whether this account is on the Hivewatchers blacklist.",
   pendingRewardsCard: "Pending author rewards that will be paid out soon.",
-  author7dCard: "Total author rewards earned in the last 7 days (HIVE equivalent).",
+  author7dCard: "Total author rewards earned in the last 7 days.",
   curation7dCard: "Total curation rewards earned in the last 7 days."
 };
  
