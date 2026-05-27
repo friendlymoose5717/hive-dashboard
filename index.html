@@ -47,7 +47,7 @@
             color: #e5e7eb;
             outline: none;
             transition: 0.2s;
-            margin-bottom: 25px; /* extra ruimte */
+            margin-bottom: 25px;
         }
 
         input#username::placeholder {
@@ -82,8 +82,8 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 15px;
-            margin-top: 35px;     /* extra ruimte */
-            margin-bottom: 35px;  /* extra ruimte */
+            margin-top: 35px;
+            margin-bottom: 35px;
         }
 
         @media (max-width: 900px) {
@@ -135,7 +135,7 @@
         }
 
         /* ----------------------------------------------------
-           TABLES — COOL DARK THEME (UPDATED)
+           TABLES — DARK THEME
         ---------------------------------------------------- */
         .data-table {
             width: 100%;
@@ -143,12 +143,11 @@
             background: #0d1628;
             border-radius: 10px;
             overflow: hidden;
-            margin-top: 35px;      /* extra ruimte */
-            margin-bottom: 35px;   /* extra ruimte */
+            margin-top: 35px;
+            margin-bottom: 35px;
             box-shadow: 0 0 14px rgba(0,0,0,0.45);
         }
 
-        /* HEADER ROW */
         .data-table thead th {
             background: #1b2b4a;
             color: #e5e7eb;
@@ -158,33 +157,38 @@
             border-bottom: 1px solid #2c3e5f;
         }
 
-        /* BODY CELLS */
         .data-table td,
         .data-table th {
             padding: 10px 12px;
             border-bottom: 1px solid #1a2438;
         }
 
-        /* ODD ROWS */
         .data-table tbody tr:nth-child(odd) {
             background: #111c30;
         }
 
-        /* EVEN ROWS */
         .data-table tbody tr:nth-child(even) {
             background: #162238;
         }
 
-        /* HOVER */
         .data-table tbody tr:hover {
             background: #1f2f4a;
         }
 
-        /* DANGER ROW — now light blue instead of red/brown */
         .data-table .danger-row td {
-            background: #243556;   /* iets lichter blauw */
+            background: #243556;
             color: #cbd5e1;
             font-weight: 600;
+        }
+
+        /* ----------------------------------------------------
+           NEW: CENTERED + COLORED TABLE TITLES
+        ---------------------------------------------------- */
+        .data-table thead tr:first-child th {
+            text-align: center;
+            color: #93c5fd; /* lichtblauw */
+            font-size: 1.25em;
+            letter-spacing: 0.5px;
         }
     </style>
 </head>
@@ -203,7 +207,6 @@
         <button id="checkBtn">Check</button>
     </div>
 
-    <!-- Dashboard content gets injected here -->
     <div id="dashboard"></div>
 
 </div>
@@ -241,7 +244,7 @@
 
 </footer>
 
-<script src="app.js"></script>
+<script src="app.js" defer></script>
 
 </body>
 </html>
