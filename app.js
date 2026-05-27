@@ -15,24 +15,28 @@ const EXCHANGES = new Set([
     "mxchive","bdhivesteem"
 ]);
 
+const SWAP_DEX = new Set([
+    "honey-swap", "hiveswap", "hive-engine", "leodex", "uswap", "uswap.hbd",
+    "keychain.swap", "graphene-swap", "swap.app", "capybaraexchange", "sw4p",
+    "p-hbd", "bnb-hbd", "logicswap", "swapbase", "demotruktrade", "chaoxing",
+    "market.backup", "swaplane", "swaplane2", "quikswap", "happycustomer"
+]);
+
+
 // Tooltips
 const TOOLTIPS = {
   repCard: "Reputation score based on upvotes received.",
   ageCard: "Number of days since the account was created.",
   hpCard: "Hive Power: your effective stake used for voting.",
-  delegatedCard: "Amount of HP delegated to other accounts.",
   delegationPctCard: "Percentage of total HP that is delegated.",
   postsCard: "Number of posts created in the last 7 days.",
   commentsCard: "Number of comments made in the last 7 days.",
   ratioCard: "Comments divided by posts.",
   transfersCard: "Total outgoing transfers in the last 30 days.",
   downvotesCard: "Number of downvotes received in the last 30 days.",
-  mutedCard: "Number of people that have muted this account.",
-  keCard: "Krampus Efficiency.",
+  keCard: "KE — Rewards/Stake Co-efficient.",
   blacklistCard: "Hivewatchers blacklist status.",
-  pendingRewardsCard: "Pending author rewards.",
-  author7dCard: "Author rewards last 7 days.",
-  curation7dCard: "Curation rewards last 7 days."
+  uniqueUpvotesCard: "Unique authors you upvoted in the last 30 days."
 };
 
 // ----------------------------------------------------
@@ -62,6 +66,9 @@ const anonId = () => {
     return id;
 };
 
+// ----------------------------------------------------
+// OUTGOING DELEGATIONS
+// ----------------------------------------------------
 async function getOutgoingDelegations(user) {
     const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
     const g = await loadGlobals();
@@ -80,7 +87,6 @@ function applyTooltips() {
         if (el) el.setAttribute("title", text);
     }
 }
-
 // ----------------------------------------------------
 // LOGGING
 // ----------------------------------------------------
@@ -156,7 +162,7 @@ async function getDelegatedHP(acc) {
 }
 
 // ----------------------------------------------------
-// HISTORY
+// HISTORY (30 DAYS)
 // ----------------------------------------------------
 async function getHistory30d(user) {
     const limit = 1000;
@@ -230,6 +236,36 @@ function downvotes(history, user) {
     return map;
 }
 
+// ----------------------------------------------------
+// UNIQUE AUTHOR UPVOTES (30 DAYS) — FIXED VERSION
+// ----------------------------------------------------
+function uniqueUpvotedAuthors(history, user) {
+    const cutoff = daysAgo(30);
+    const authors = new Set();
+
+    for (const h of history) {
+        const op = h[1].op;
+        if (!op || op[0] !== "vote") continue;
+
+        const v = op[1];
+        const ts = new Date(h[1].timestamp).getTime();
+        if (ts < cutoff) continue;
+
+        // Skip invalid votes (prevents crashes)
+        if (!v.author || v.author.trim() === "") continue;
+
+        // Only positive votes cast BY the user
+        if (v.voter.toLowerCase() === user && v.weight > 0) {
+            authors.add(v.author.toLowerCase());
+        }
+    }
+
+    return authors.size;
+}
+
+// ----------------------------------------------------
+// TRANSFERS
+// ----------------------------------------------------
 function outgoingTransfers(history, user) {
     return history
         .filter(h => h[1].op[0] === "transfer")
@@ -254,7 +290,6 @@ function summarizeTransfers(list) {
     }
     return { hive, hbd, perUser };
 }
-
 // ----------------------------------------------------
 // KE — KRAMPUS EFFICIENCY
 // ----------------------------------------------------
@@ -306,10 +341,9 @@ async function checkUser() {
             <div class="card" id="ageCard"><div class="label">Account age (days)</div><div class="value">${age}</div></div>
             <div class="card" id="hpCard"><div class="label">Active HP</div><div class="value">${hp.toFixed(3)}</div></div>
 
-            <div class="card" id="delegatedCard"><div class="label">Delegated HP</div><div class="value">${dHP.toFixed(3)}</div></div>
             <div class="card" id="delegationPctCard"><div class="label">Delegation %</div><div class="value">${dPct.toFixed(1)}%</div></div>
 
-            <div class="card" id="keCard"><div class="label">KE (Krampus Efficiency)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
+            <div class="card" id="keCard"><div class="label">KE (Rewards/Stake Co-efficient)</div><div class="value">${ke.krampus.toFixed(4)}</div></div>
 
             <div class="card loading" id="postsCard"><div class="label">Posts (7d)</div><div class="value">Loading…</div></div>
             <div class="card loading" id="commentsCard"><div class="label">Comments (7d)</div><div class="value">Loading…</div></div>
@@ -318,11 +352,17 @@ async function checkUser() {
             <div class="card loading" id="transfersCard"><div class="label">Outgoing transfers (30d)</div><div class="value">Loading…</div></div>
             <div class="card loading" id="downvotesCard"><div class="label">Incoming downvotes (30d)</div><div class="value">Loading…</div></div>
 
+            <div class="card loading" id="uniqueUpvotesCard">
+                <div class="label">Unique author upvotes (30d)</div>
+                <div class="value">Loading…</div>
+            </div>
+
             <div class="card" id="blacklistCard"><div class="label">Hivewatchers blacklist</div><div class="value">${isBL ? "YES" : "NO"}</div></div>
         </div>
 
         <div id="transferTable"></div>
         <div id="downvoteTable"></div>
+        <div id="delegationTable"></div>
     `;
 
     applyTooltips();
@@ -332,7 +372,6 @@ async function checkUser() {
     setCard("ageCard", age, age < 31 ? "danger" : "ok");
     setCard("hpCard", hp.toFixed(3), hp < 100 ? "danger" : "ok");
 
-    setCard("delegatedCard", dHP.toFixed(3), dHP > 25000 ? "warning" : "ok");
     setCard("delegationPctCard", dPct.toFixed(1) + "%", dPct > 50 ? "danger" : dPct > 25 ? "warning" : "ok");
 
     setCard("blacklistCard", isBL ? "YES" : "NO", isBL ? "danger" : "ok");
@@ -358,6 +397,15 @@ async function checkUser() {
 
     setCard("ratioCard", pc.ratio.toFixed(2), ratioStatus);
 
+    // UNIQUE UPVOTES
+    const uniqueUp = uniqueUpvotedAuthors(hist, user);
+    const upStatus =
+        uniqueUp < 25 ? "danger" :
+        uniqueUp < 100 ? "warning" :
+        "ok";
+
+    setCard("uniqueUpvotesCard", uniqueUp, upStatus);
+
     // TRANSFERS
     const transfers = outgoingTransfers(hist, user);
     const sum = summarizeTransfers(transfers);
@@ -375,7 +423,13 @@ async function checkUser() {
                 <tbody>
                     ${Object.entries(sum.perUser).map(([to, v]) => `
                         <tr class="danger-row">
-                            <td>${EXCHANGES.has(to.toLowerCase()) ? to + " (exchange)" : to}</td>
+                           <td>${
+    EXCHANGES.has(to.toLowerCase()) 
+        ? to + " (exchange)" 
+        : SWAP_DEX.has(to.toLowerCase())
+            ? to + " (swap/dex)"
+            : to
+}</td>
                             <td>${v.hive.toFixed(3)} HIVE<br>${v.hbd.toFixed(3)} HBD</td>
                         </tr>
                     `).join("")}
@@ -388,7 +442,11 @@ async function checkUser() {
     const dv = downvotes(hist, user);
     const totalDV = Object.values(dv).reduce((a, b) => a + b, 0);
 
-    const dvStatus = totalDV >= 10 ? "danger" : totalDV > 0 ? "warning" : "ok";
+    const dvStatus =
+        totalDV >= 10 ? "danger" :
+        totalDV > 0 ? "warning" :
+        "ok";
+
     setCard("downvotesCard", totalDV, dvStatus);
 
     if (totalDV > 0) {
@@ -411,10 +469,32 @@ async function checkUser() {
             </table>
         `;
     }
+
+    // OUTGOING DELEGATIONS
+    const delegs = await getOutgoingDelegations(user);
+
+    if (delegs.length > 0) {
+        document.getElementById("delegationTable").innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr><th colspan="2">Outgoing delegations</th></tr>
+                    <tr><th>Delegatee</th><th>HP delegated</th></tr>
+                </thead>
+                <tbody>
+                    ${delegs.map(d => `
+                        <tr class="danger-row">
+                            <td>${EXCHANGES.has(d.to.toLowerCase()) ? d.to + " (exchange)" : d.to}</td>
+                            <td>${d.hp.toFixed(3)} HP</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        `;
+    }
 }
 
 // ----------------------------------------------------
-// EVENTS — FIXED & CLEAN
+// EVENTS
 // ----------------------------------------------------
 document.getElementById("checkBtn").addEventListener("click", checkUser);
 
@@ -422,5 +502,4 @@ document.getElementById("username").addEventListener("keydown", e => {
     if (e.key === "Enter") checkUser();
 });
 
-// Make checkUser globally accessible (fix for inline handlers)
 window.checkUser = checkUser;
