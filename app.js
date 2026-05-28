@@ -5,6 +5,9 @@ let blacklist = new Set();
 let globals = null;
 let lastSearch = 0;
 
+let loggedInUser = null;
+let userPreferences = { hiddenBlocks: [] };
+
 // Exchange accounts
 const EXCHANGES = new Set([
     "deepcrypto8","binance-hot","poloniex","bittrex","upbitsteem",
@@ -22,8 +25,6 @@ const SWAP_DEX = new Set([
     "market.backup", "swaplane", "swaplane2", "quikswap", "happycustomer"
 ]);
 
-
-// Tooltips
 const TOOLTIPS = {
   repCard: "Reputation score based on upvotes received.",
   ageCard: "Number of days since the account was created.",
@@ -39,6 +40,21 @@ const TOOLTIPS = {
   uniqueUpvotesCard: "Unique authors you upvoted in the last 30 days."
 };
 
+const BLOCKS = [
+    "repCard",
+    "ageCard",
+    "hpCard",
+    "delegationPctCard",
+    "keCard",
+    "postsCard",
+    "commentsCard",
+    "ratioCard",
+    "transfersCard",
+    "downvotesCard",
+    "uniqueUpvotesCard",
+    "blacklistCard"
+];
+
 // ----------------------------------------------------
 // HELPERS
 // ----------------------------------------------------
@@ -53,6 +69,7 @@ const daysAgo = d => Date.now() - d * 86400000;
 
 const setCard = (id, value, status) => {
     const el = document.getElementById(id);
+    if (!el) return;
     el.querySelector(".value").innerHTML = value;
     el.className = "card " + status;
 };
@@ -66,27 +83,26 @@ const anonId = () => {
     return id;
 };
 
-// ----------------------------------------------------
-// OUTGOING DELEGATIONS
-// ----------------------------------------------------
-async function getOutgoingDelegations(user) {
-    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
-    const g = await loadGlobals();
-    const fund = parseFloat(g.total_vesting_fund_hive);
-    const shares = parseFloat(g.total_vesting_shares);
-
-    return delegs.map(d => ({
-        to: d.delegatee,
-        hp: parseFloat(d.vesting_shares) * (fund / shares)
-    }));
-}
-
 function applyTooltips() {
     for (const [id, text] of Object.entries(TOOLTIPS)) {
         const el = document.getElementById(id);
         if (el) el.setAttribute("title", text);
     }
 }
+
+const throttle = () => {
+    const now = Date.now();
+    if (now - lastSearch < 1500) return false;
+    lastSearch = now;
+    return true;
+};
+
+async function loadGlobals() {
+    if (globals) return globals;
+    globals = await api("condenser_api.get_dynamic_global_properties");
+    return globals;
+}
+
 // ----------------------------------------------------
 // LOGGING
 // ----------------------------------------------------
@@ -108,23 +124,158 @@ async function logSearch(username) {
         console.error("Webhook error:", e);
     }
 }
-
-const throttle = () => {
-    const now = Date.now();
-    if (now - lastSearch < 1500) return false;
-    lastSearch = now;
-    return true;
-};
-
 // ----------------------------------------------------
-// LOADERS
+// HIVE KEYCHAIN LOGIN + PREFERENCES
 // ----------------------------------------------------
-async function loadGlobals() {
-    if (globals) return globals;
-    globals = await api("condenser_api.get_dynamic_global_properties");
-    return globals;
+async function loginWithKeychain() {
+    if (!window.hive_keychain) {
+        alert("Hive Keychain is not installed.");
+        return;
+    }
+
+    const username = prompt("Enter your Hive username:");
+    if (!username) return;
+
+    hive_keychain.requestSignBuffer(
+        username,
+        "login-" + Date.now(),
+        "Posting",
+        async (res) => {
+            if (res.success) {
+                loggedInUser = username.toLowerCase();
+                document.getElementById("loginStatus").innerHTML =
+                    "Logged in as @" + loggedInUser;
+
+                await loadUserPreferences();
+                renderPreferenceMenu();
+            } else {
+                alert("Login failed.");
+            }
+        }
+    );
 }
 
+async function saveUserPreferences() {
+    if (!loggedInUser) return;
+
+    const json = {
+        app: "hive-account-health-dashboard",
+        prefs: userPreferences
+    };
+
+    hive_keychain.requestCustomJson(
+        loggedInUser,
+        "hive-dashboard-prefs",
+        "Posting",
+        JSON.stringify(json),
+        "Save dashboard preferences",
+        (res) => {
+            if (!res.success) {
+                alert("Failed to save preferences.");
+            }
+        }
+    );
+}
+
+async function loadUserPreferences() {
+    if (!loggedInUser) {
+        userPreferences = { hiddenBlocks: [] };
+        return;
+    }
+
+    const history = await api("condenser_api.get_account_history", [
+        loggedInUser,
+        -1,
+        1000
+    ]);
+
+    userPreferences = { hiddenBlocks: [] };
+
+    for (const h of history.reverse()) {
+        const op = h[1].op;
+        if (op[0] === "custom_json" && op[1].id === "hive-dashboard-prefs") {
+            try {
+                const data = JSON.parse(op[1].json);
+                userPreferences = data.prefs || { hiddenBlocks: [] };
+                return;
+            } catch (e) {
+                console.error("Prefs parse error:", e);
+            }
+        }
+    }
+}
+
+function renderPreferenceMenu() {
+    const menu = document.getElementById("prefMenu");
+    const opts = document.getElementById("prefOptions");
+
+    if (!loggedInUser) {
+        menu.style.display = "none";
+        return;
+    }
+
+    menu.style.display = "block";
+
+    if (!userPreferences.hiddenBlocks) userPreferences.hiddenBlocks = [];
+
+    opts.innerHTML = BLOCKS.map(id => `
+        <label style="display:block; margin:6px 0;">
+            <input type="checkbox" data-block="${id}"
+                ${!userPreferences.hiddenBlocks.includes(id) ? "checked" : ""}>
+            ${id}
+        </label>
+    `).join("");
+
+    opts.querySelectorAll("input").forEach(chk => {
+        chk.addEventListener("change", () => {
+            const id = chk.dataset.block;
+            if (!chk.checked) {
+                if (!userPreferences.hiddenBlocks.includes(id))
+                    userPreferences.hiddenBlocks.push(id);
+            } else {
+                userPreferences.hiddenBlocks =
+                    userPreferences.hiddenBlocks.filter(x => x !== id);
+            }
+            applyBlockVisibility();
+        });
+    });
+
+    applyBlockVisibility();
+}
+
+function applyBlockVisibility() {
+    if (!userPreferences.hiddenBlocks) return;
+
+    for (const id of BLOCKS) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+
+        if (userPreferences.hiddenBlocks.includes(id)) {
+            el.style.display = "none";
+        } else {
+            el.style.display = "block";
+        }
+    }
+}
+
+// ----------------------------------------------------
+// OUTGOING DELEGATIONS
+// ----------------------------------------------------
+async function getOutgoingDelegations(user) {
+    const delegs = await api("condenser_api.get_vesting_delegations", [user, "", 1000]);
+    const g = await loadGlobals();
+    const fund = parseFloat(g.total_vesting_fund_hive);
+    const shares = parseFloat(g.total_vesting_shares);
+
+    return delegs.map(d => ({
+        to: d.delegatee,
+        hp: parseFloat(d.vesting_shares) * (fund / shares)
+    }));
+}
+
+// ----------------------------------------------------
+// BLACKLIST + ACCOUNT DATA
+// ----------------------------------------------------
 async function loadBlacklist() {
     try {
         const res = await fetch("https://spaminator.me/api/bl/all.json");
@@ -135,9 +286,6 @@ async function loadBlacklist() {
     }
 }
 
-// ----------------------------------------------------
-// ACCOUNT DATA
-// ----------------------------------------------------
 const getAccount = u => api("condenser_api.get_accounts", [[u]]).then(r => r?.[0] || null);
 const getReputation = u => api("bridge.get_profile", [{ account: u }]).then(r => r?.reputation || 0);
 
@@ -160,7 +308,6 @@ async function getDelegatedHP(acc) {
     const ds = parseFloat(acc.delegated_vesting_shares);
     return ds * (fund / shares);
 }
-
 // ----------------------------------------------------
 // HISTORY (30 DAYS)
 // ----------------------------------------------------
@@ -236,9 +383,6 @@ function downvotes(history, user) {
     return map;
 }
 
-// ----------------------------------------------------
-// UNIQUE AUTHOR UPVOTES (30 DAYS) — FIXED VERSION
-// ----------------------------------------------------
 function uniqueUpvotedAuthors(history, user) {
     const cutoff = daysAgo(30);
     const authors = new Set();
@@ -251,10 +395,8 @@ function uniqueUpvotedAuthors(history, user) {
         const ts = new Date(h[1].timestamp).getTime();
         if (ts < cutoff) continue;
 
-        // Skip invalid votes (prevents crashes)
         if (!v.author || v.author.trim() === "") continue;
 
-        // Only positive votes cast BY the user
         if (v.voter.toLowerCase() === user && v.weight > 0) {
             authors.add(v.author.toLowerCase());
         }
@@ -290,6 +432,7 @@ function summarizeTransfers(list) {
     }
     return { hive, hbd, perUser };
 }
+
 // ----------------------------------------------------
 // KE — KRAMPUS EFFICIENCY
 // ----------------------------------------------------
@@ -311,7 +454,7 @@ async function computeKE(acc) {
 }
 
 // ----------------------------------------------------
-// MAIN
+// MAIN DASHBOARD
 // ----------------------------------------------------
 async function checkUser() {
     const user = document.getElementById("username").value.trim().toLowerCase();
@@ -323,7 +466,10 @@ async function checkUser() {
     dash.innerHTML = "Loading…";
 
     const acc = await getAccount(user);
-    if (!acc) return dash.innerHTML = "Account not found";
+    if (!acc) {
+        dash.innerHTML = "Account not found";
+        return;
+    }
 
     if (!blacklist.size) await loadBlacklist();
 
@@ -405,13 +551,16 @@ async function checkUser() {
         "ok";
 
     setCard("uniqueUpvotesCard", uniqueUp, upStatus);
-
     // TRANSFERS
     const transfers = outgoingTransfers(hist, user);
     const sum = summarizeTransfers(transfers);
 
     const tStatus = (sum.hive > 10 || sum.hbd > 5) ? "warning" : "ok";
-    setCard("transfersCard", `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`, tStatus);
+    setCard(
+        "transfersCard",
+        `${sum.hive.toFixed(3)} HIVE<br>${sum.hbd.toFixed(3)} HBD`,
+        tStatus
+    );
 
     if (Object.keys(sum.perUser).length) {
         document.getElementById("transferTable").innerHTML = `
@@ -491,6 +640,11 @@ async function checkUser() {
             </table>
         `;
     }
+
+    // Apply visibility if logged in
+    if (loggedInUser) {
+        applyBlockVisibility();
+    }
 }
 
 // ----------------------------------------------------
@@ -502,4 +656,8 @@ document.getElementById("username").addEventListener("keydown", e => {
     if (e.key === "Enter") checkUser();
 });
 
+document.getElementById("loginKeychainBtn").addEventListener("click", loginWithKeychain);
+
 window.checkUser = checkUser;
+window.loginWithKeychain = loginWithKeychain;
+window.saveUserPreferences = saveUserPreferences;
