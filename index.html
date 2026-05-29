@@ -1,247 +1,246 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Hive Account Health Dashboard</title>
+    <meta charset="UTF-8" />
+    <title>Hive Account Health Dashboard</title>
 
-<style>
-/* ----------------------------------------------------
-          GLOBAL
-       ---------------------------------------------------- */
-body {
-margin: 0;
-font-family: Arial, sans-serif;
-background: #0b1220;
-color: #e5e7eb;
-}
+    <style>
+        /* ----------------------------------------------------
+           GLOBAL
+        ---------------------------------------------------- */
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b1220;
+            color: #e5e7eb;
+        }
 
-.container {
-max-width: 900px;
-margin: auto;
-padding: 30px;
-}
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 30px;
+        }
 
-/* ----------------------------------------------------
-          HEADER
-       ---------------------------------------------------- */
-.header {
-text-align: center;
-margin-bottom: 25px;
-}
+        /* ----------------------------------------------------
+           HEADER
+        ---------------------------------------------------- */
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
 
-.header img {
-width: 160px;
-margin-bottom: 10px;
-opacity: 0.9;
-}
+        .header img {
+            width: 160px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
 
-/* ----------------------------------------------------
-          INPUT + BUTTON (BLUE THEME)
-       ---------------------------------------------------- */
-input#username {
-width: 70%;
-padding: 12px;
-border-radius: 8px;
-border: 1px solid #3b82f6;
-background: #1e3a8a;
-color: #e5e7eb;
-outline: none;
-transition: 0.2s;
-margin-bottom: 25px;
-}
+        /* ----------------------------------------------------
+           INPUT + BUTTON (BLUE THEME)
+        ---------------------------------------------------- */
+        input#username {
+            width: 70%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #3b82f6;
+            background: #1e3a8a;
+            color: #e5e7eb;
+            outline: none;
+            transition: 0.2s;
+            margin-bottom: 25px;
+        }
 
-input#username::placeholder {
-color: #cbd5e1;
-}
+        input#username::placeholder {
+            color: #cbd5e1;
+        }
 
-input#username:focus {
-background: #1e40af;
-border-color: #60a5fa;
-box-shadow: 0 0 8px rgba(96,165,250,0.4);
-}
+        input#username:focus {
+            background: #1e40af;
+            border-color: #60a5fa;
+            box-shadow: 0 0 8px rgba(96,165,250,0.4);
+        }
 
-button {
-padding: 12px 16px;
-border: none;
-border-radius: 8px;
-background: #3b82f6;
-color: white;
-cursor: pointer;
-margin-left: 8px;
-transition: 0.2s;
-}
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #3b82f6;
+            color: white;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: 0.2s;
+        }
 
-button:hover {
-background: #2563eb;
-}
+        button:hover {
+            background: #2563eb;
+        }
 
-/* ----------------------------------------------------
-          GRID + CARDS
-       ---------------------------------------------------- */
-.grid {
-display: grid;
-grid-template-columns: repeat(3, 1fr);
-gap: 15px;
-margin-top: 35px;
-margin-bottom: 35px;
-}
+        /* ----------------------------------------------------
+           GRID + CARDS
+        ---------------------------------------------------- */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 35px;
+            margin-bottom: 35px;
+        }
 
-@media (max-width: 900px) {
-.grid { grid-template-columns: repeat(2, 1fr); }
-}
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: repeat(2, 1fr); }
+        }
 
-@media (max-width: 600px) {
-.grid { grid-template-columns: 1fr; }
-}
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: 1fr; }
+        }
 
-.card {
-background: #111827;
-border-radius: 12px;
-padding: 15px;
-border: 1px solid #1f2937;
-transition: 0.25s;
-}
+        .card {
+            background: #111827;
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid #1f2937;
+            transition: 0.25s;
+        }
 
-.card.ok {
-background: #064e3b;
-border-color: #10b981;
-}
+        .card.ok {
+            background: #064e3b;
+            border-color: #10b981;
+        }
 
-.card.warning {
-background: #f18932;
+        .card.warning {
+            background: #e4b20c;
             border-color: #f59e0b;
-            border-color: #f44336;
-}
+        }
 
-.card.danger {
-background: #7f1d1d;
-border-color: #ef4444;
-}
+        .card.danger {
+            background: #7f1d1d;
+            border-color: #ef4444;
+        }
 
-.card.loading {
-background: #1f2937;
-border-color: #374151;
-opacity: 0.6;
-}
+        .card.loading {
+            background: #1f2937;
+            border-color: #374151;
+            opacity: 0.6;
+        }
 
-.label {
-font-size: 12px;
-opacity: 0.7;
-}
+        .label {
+            font-size: 12px;
+            opacity: 0.7;
+        }
 
-.value {
-font-size: 22px;
-margin-top: 6px;
-font-weight: bold;
-}
+        .value {
+            font-size: 22px;
+            margin-top: 6px;
+            font-weight: bold;
+        }
 
-/* ----------------------------------------------------
-          TABLES — DARK THEME
-       ---------------------------------------------------- */
-.data-table {
-width: 100%;
-border-collapse: collapse;
-background: #0d1628;
-border-radius: 10px;
-overflow: hidden;
-margin-top: 35px;
-margin-bottom: 35px;
-box-shadow: 0 0 14px rgba(0,0,0,0.45);
-}
+        /* ----------------------------------------------------
+           TABLES — DARK THEME
+        ---------------------------------------------------- */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #0d1628;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 35px;
+            margin-bottom: 35px;
+            box-shadow: 0 0 14px rgba(0,0,0,0.45);
+        }
 
-.data-table thead th {
-background: #1b2b4a;
-color: #e5e7eb;
-padding: 12px;
-font-size: 1.1em;
-text-align: left;
-border-bottom: 1px solid #2c3e5f;
-}
+        .data-table thead th {
+            background: #1b2b4a;
+            color: #e5e7eb;
+            padding: 12px;
+            font-size: 1.1em;
+            text-align: left;
+            border-bottom: 1px solid #2c3e5f;
+        }
 
-.data-table td,
-.data-table th {
-padding: 10px 12px;
-border-bottom: 1px solid #1a2438;
-}
+        .data-table td,
+        .data-table th {
+            padding: 10px 12px;
+            border-bottom: 1px solid #1a2438;
+        }
 
-.data-table tbody tr:nth-child(odd) {
-background: #111c30;
-}
+        .data-table tbody tr:nth-child(odd) {
+            background: #111c30;
+        }
 
-.data-table tbody tr:nth-child(even) {
-background: #162238;
-}
+        .data-table tbody tr:nth-child(even) {
+            background: #162238;
+        }
 
-.data-table tbody tr:hover {
-background: #1f2f4a;
-}
+        .data-table tbody tr:hover {
+            background: #1f2f4a;
+        }
 
-.data-table .danger-row td {
-background: #243556;
-color: #cbd5e1;
-font-weight: 600;
-}
+        .data-table .danger-row td {
+            background: #243556;
+            color: #cbd5e1;
+            font-weight: 600;
+        }
 
-/* ----------------------------------------------------
-          NEW: CENTERED + COLORED TABLE TITLES
-       ---------------------------------------------------- */
-.data-table thead tr:first-child th {
-text-align: center;
-color: #93c5fd; /* lichtblauw */
-font-size: 1.25em;
-letter-spacing: 0.5px;
-}
-</style>
+        /* ----------------------------------------------------
+           NEW: CENTERED + COLORED TABLE TITLES
+        ---------------------------------------------------- */
+        .data-table thead tr:first-child th {
+            text-align: center;
+            color: #93c5fd; /* lichtblauw */
+            font-size: 1.25em;
+            letter-spacing: 0.5px;
+        }
+    </style>
 </head>
 
 <body>
 
 <div class="container">
 
-<div class="header">
-<img src="https://developers.hive.io/images/logotype_black.svg">
-<h1>Hive Account Health Dashboard</h1>
-</div>
+    <div class="header">
+        <img src="https://developers.hive.io/images/logotype_black.svg">
+        <h1>Hive Account Health Dashboard</h1>
+    </div>
 
-<div>
-<input id="username" placeholder="username" />
-<button id="checkBtn">Check</button>
-</div>
+    <div>
+        <input id="username" placeholder="username" />
+        <button id="checkBtn">Check</button>
+    </div>
 
-<div id="dashboard"></div>
+    <div id="dashboard"></div>
 
 </div>
 
 <footer style="margin-top:40px; text-align:center; opacity:0.85; font-size:0.9rem;">
 
-<img src="https://files.peakd.com/file/peakd-hive/friendlymoose/avatar.png"
-alt="Friendlymoose avatar"
-style="width:40px; height:40px; border-radius:50%; display:block; margin:0 auto 6px auto;">
+    <img src="https://files.peakd.com/file/peakd-hive/friendlymoose/avatar.png"
+         alt="Friendlymoose avatar"
+         style="width:40px; height:40px; border-radius:50%; display:block; margin:0 auto 6px auto;">
 
-<div style="margin-bottom:6px;">
-Created by 
-<a href="https://peakd.com/@friendlymoose"
-target="_blank"
-style="color:#e5e7eb; text-decoration:underline;">
-Friendlymoose
-</a>
-</div>
+    <div style="margin-bottom:6px;">
+        Created by 
+        <a href="https://peakd.com/@friendlymoose"
+           target="_blank"
+           style="color:#e5e7eb; text-decoration:underline;">
+           Friendlymoose
+        </a>
+    </div>
 
-<a href="https://discord.gg/txTGEH5zr4"
-target="_blank"
-style="
-          display:inline-flex;
-          align-items:center;
-          gap:6px;
-          text-decoration:none;
-          color:#7289da;
-          font-weight:bold;
-      ">
-<img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg"
-alt="Discord"
-style="width:20px; height:20px; filter:invert(60%) sepia(20%) saturate(800%) hue-rotate(200deg);">
-Questions or suggestions? Join our Discord!
-</a>
+    <a href="https://discord.gg/txTGEH5zr4"
+       target="_blank"
+       style="
+           display:inline-flex;
+           align-items:center;
+           gap:6px;
+           text-decoration:none;
+           color:#7289da;
+           font-weight:bold;
+       ">
+        <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg"
+             alt="Discord"
+             style="width:20px; height:20px; filter:invert(60%) sepia(20%) saturate(800%) hue-rotate(200deg);">
+        Questions or suggestions? Join our Discord!
+    </a>
 
 </footer>
 
