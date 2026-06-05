@@ -22,6 +22,42 @@
         }
 
         /* ----------------------------------------------------
+           TOP BAR (KEYCHAIN LOGIN + SETTINGS)
+        ---------------------------------------------------- */
+        #topBar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 25px;
+            background: #111827;
+            border-bottom: 1px solid #1f2937;
+        }
+
+        #loginUserInput {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #3b82f6;
+            background: #1e3a8a;
+            color: white;
+            width: 160px;
+        }
+
+        #settingsPanel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 260px;
+            background: #1f2937;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            box-shadow: 0 0 12px rgba(0,0,0,0.4);
+        }
+
+        .hidden { display: none; }
+
+        /* ----------------------------------------------------
            HEADER
         ---------------------------------------------------- */
         .header {
@@ -181,12 +217,9 @@
             font-weight: 600;
         }
 
-        /* ----------------------------------------------------
-           NEW: CENTERED + COLORED TABLE TITLES
-        ---------------------------------------------------- */
         .data-table thead tr:first-child th {
             text-align: center;
-            color: #93c5fd; /* lichtblauw */
+            color: #93c5fd;
             font-size: 1.25em;
             letter-spacing: 0.5px;
         }
@@ -194,6 +227,23 @@
 </head>
 
 <body>
+
+<!-- 🔐 TOP BAR -->
+<div id="topBar">
+    <input id="loginUserInput" type="text" placeholder="Hive username…">
+    <button id="kcLoginBtn">Keychain Login</button>
+
+    <span id="settingsBtn" style="cursor:pointer; font-size:20px;">⚙️</span>
+
+    <span id="loginStatus" style="margin-left:15px; opacity:0.8;"></span>
+</div>
+
+<!-- ⚙️ SETTINGS PANEL -->
+<div id="settingsPanel" class="hidden">
+    <h3>Dashboard Settings</h3>
+    <div id="settingsContent"></div>
+    <button id="savePrefsBtn">Save</button>
+</div>
 
 <div class="container">
 
